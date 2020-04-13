@@ -14,7 +14,7 @@ func NewIntegerField(name string) *IntegerField {
 
 func (f *IntegerField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewTextFieldElement("", "")
+	b := wajaf.NewTextFieldElement(f.ID)
 
 	return b
 }

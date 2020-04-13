@@ -14,7 +14,7 @@ func NewFloatField(name string) *FloatField {
 
 func (f *FloatField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewTextFieldElement("", "")
+	b := wajaf.NewTextFieldElement(f.ID)
 
 	return b
 }

@@ -12,7 +12,7 @@ func NewTextAreaField(name string) *TextAreaField {
 
 func (f *TextAreaField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewTextAreaFieldElement("", "")
+	b := wajaf.NewTextAreaFieldElement(f.ID)
 
 	return b
 }

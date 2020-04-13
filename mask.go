@@ -120,7 +120,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 		group.AddEvent("failure", m.FailureJS)
 	}
 
-	zcontrol := wajaf.NewGroupZone("control")
+	zcontrol := wajaf.NewGroupZone("group", "")
 	group.AddChild(zcontrol)
 
 	for _, f := range m.Fields {
@@ -128,13 +128,14 @@ func (m *Mask) Compile() wajaf.NodeDef {
 			zcontrol.AddChild(f.Compile())
 			continue
 		}
-		z := wajaf.NewGroupZone("")
+		z := wajaf.NewGroupZone("field", "")
 		z.AddChild(f.Compile())
 		group.AddChild(z)
 	}
 
 	for id, val := range m.Variables {
-		h := wajaf.NewHiddenFieldElement(id, val)
+		h := wajaf.NewHiddenFieldElement(id)
+		h.SetData(val)
 		zcontrol.AddChild(h)
 	}
 
@@ -144,7 +145,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 		if rec != nil {
 			// rec must be a JSON
 			jsonrec, _ := json.Marshal(rec)
-			zdata := wajaf.NewGroupDataset(string(jsonrec))
+			zdata := wajaf.NewGroupDataset("", string(jsonrec))
 			group.AddChild(zdata)
 		}
 	}
