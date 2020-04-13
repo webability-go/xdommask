@@ -16,6 +16,10 @@ TO DO:
 Version Changes Control
 =======================
 
+v0.0.2 - 2020-04-13
+------------------------
+- mask, text, button with all attributes and messages
+
 v0.0.1 - 2020-04-12
 ------------------------
 - Added Compile and zones without ID
