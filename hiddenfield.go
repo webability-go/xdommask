@@ -12,7 +12,7 @@ func NewHiddenField(name string) *HiddenField {
 
 func (f *HiddenField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewHiddenFieldElement("", "")
+	b := wajaf.NewHiddenFieldElement(f.ID)
 
 	return b
 }

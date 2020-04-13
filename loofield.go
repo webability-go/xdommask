@@ -12,7 +12,7 @@ func NewLOOField(name string) *LOOField {
 
 func (f *LOOField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewLOVFieldElement("", "")
+	b := wajaf.NewLOVFieldElement(f.ID)
 
 	return b
 }

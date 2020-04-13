@@ -21,12 +21,11 @@ type Field struct {
 	DisabledModes Mode
 	HelpModes     Mode
 
-	Title           string // title for editable, in button for control
 	HelpToolTip     string
 	HelpDescription string
 	HelpTitle       string
 	TabIndex        int
-	Size            int
+	Size            string
 
 	JS    string
 	Focus string
@@ -46,6 +45,7 @@ type DataField struct {
 	InRecord    bool
 	URLVariable string
 
+	Title        string // title for editable, in button for control
 	Auto         bool
 	DefaultValue interface{}
 	Encoded      bool
@@ -73,7 +73,11 @@ func (f *DataField) Compile() wajaf.NodeDef {
 
 type ControlField struct {
 	*Field
-	Control bool
+	TitleInsert string
+	TitleUpdate string
+	TitleDelete string
+	TitleView   string
+	Control     bool
 }
 
 func NewControlField(name string) *ControlField {
