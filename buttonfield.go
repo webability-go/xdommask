@@ -4,6 +4,7 @@ import "github.com/webability-go/wajaf"
 
 type ButtonField struct {
 	*ControlField
+	Action string
 }
 
 func NewButtonField(name string) *ButtonField {
@@ -16,6 +17,9 @@ func (f *ButtonField) Compile() wajaf.NodeDef {
 
 	b.SetAttribute("style", f.Style)
 	b.SetAttribute("classname", f.ClassName)
+	b.SetData(f.Title)
+
+	b.SetAttribute("action", f.Action)
 
 	return b
 
