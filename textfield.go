@@ -30,6 +30,10 @@ func (f *TextField) Compile() wajaf.NodeDef {
 
 	t := wajaf.NewTextFieldElement("", "")
 
+	t.SetAttribute("style", f.Style)
+	t.SetAttribute("classname", f.ClassName)
+	t.SetData(f.Title)
+
 	return t
 
 	//	$f = new \wajaf\textfieldElement($this->name);

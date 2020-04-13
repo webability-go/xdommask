@@ -53,6 +53,18 @@ type Mask struct {
 
 	Counter int
 	Fields  []FieldDef
+
+	// Hooks
+	PreInsert  func(*Mask, *xdominion.XRecord) error
+	Insert     func(*Mask, *xdominion.XRecord) error
+	PostInsert func(*Mask, *xdominion.XRecord) error
+	PreUpdate  func(*Mask, *xdominion.XRecord) error
+	Update     func(*Mask, *xdominion.XRecord) error
+	PostUpdate func(*Mask, *xdominion.XRecord) error
+	PreDelete  func(*Mask, *xdominion.XRecord) error
+	Delete     func(*Mask, *xdominion.XRecord) error
+	PostDelete func(*Mask, *xdominion.XRecord) error
+	GetRecord  func(*Mask) *xdominion.XRecord
 }
 
 func NewMask(id string) *Mask {
@@ -69,10 +81,6 @@ func NewMask(id string) *Mask {
 
 func (m *Mask) AddField(f FieldDef) {
 	m.Fields = append(m.Fields, f)
-}
-
-func (m *Mask) GetRecord() *xdominion.XRecord {
-	return nil
 }
 
 func (m *Mask) Compile() wajaf.NodeDef {
@@ -120,7 +128,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 			zcontrol.AddChild(f.Compile())
 			continue
 		}
-		z := wajaf.NewGroupZone("field")
+		z := wajaf.NewGroupZone("")
 		z.AddChild(f.Compile())
 		group.AddChild(z)
 	}
@@ -131,12 +139,14 @@ func (m *Mask) Compile() wajaf.NodeDef {
 	}
 
 	// Original dataset
-	rec := m.GetRecord()
-	if rec != nil {
-		// rec must be a JSON
-		jsonrec, _ := json.Marshal(rec)
-		zdata := wajaf.NewGroupDataset(string(jsonrec))
-		group.AddChild(zdata)
+	if m.GetRecord != nil {
+		rec := m.GetRecord(m)
+		if rec != nil {
+			// rec must be a JSON
+			jsonrec, _ := json.Marshal(rec)
+			zdata := wajaf.NewGroupDataset(string(jsonrec))
+			group.AddChild(zdata)
+		}
 	}
 
 	return group

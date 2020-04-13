@@ -16,6 +16,11 @@ TO DO:
 Version Changes Control
 =======================
 
-v0.0.0 - 2020-03-08
+v0.0.1 - 2020-04-12
+------------------------
+- Added Compile and zones without ID
+- Added some field for button and text
+
+v0.0.0 - 2020-04-08
 ------------------------
 - First realease

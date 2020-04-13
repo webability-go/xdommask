@@ -7,16 +7,22 @@ import (
 	"github.com/webability-go/xdominion"
 )
 
-type MyMask Mask
+type MyMask struct {
+	*Mask
+}
 
-func (m *MyMask) GetRecord() *xdominion.XRecord {
+func GetRecord(m *Mask) *xdominion.XRecord {
 	fmt.Println("GET RECORD DE MYMASK")
-	return xdominion.NewXRecord()
+	rec := xdominion.NewXRecord()
+	rec.Set("Field1", "Value1")
+	fmt.Println(rec)
+	return rec
 }
 
 func TestNewMask(t *testing.T) {
 
-	mask := &MyMask{}
+	mask := &MyMask{Mask: NewMask("")}
+	mask.GetRecord = GetRecord
 	mask.Mode = INSERT
 	mask.Variables["COUNTRY"] = "MX"
 	mask.Variables["LANGUAGE"] = "es"
