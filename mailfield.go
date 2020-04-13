@@ -1,6 +1,11 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/webability-go/wajaf"
+)
 
 type MailField struct {
 	*TextField

@@ -16,6 +16,10 @@ TO DO:
 Version Changes Control
 =======================
 
+v0.0.3 - 2020-04-13
+------------------------
+- some errors corrected on fields
+
 v0.0.2 - 2020-04-13
 ------------------------
 - mask, text, button with all attributes and messages

@@ -23,7 +23,7 @@ func (f *ButtonField) Compile() wajaf.NodeDef {
 	b.AddMessage("titledelete", f.TitleDelete)
 	b.AddMessage("titleview", f.TitleView)
 
-	t.SetAttribute("visible", createModes(f.AuthModes))
+	b.SetAttribute("visible", createModes(f.AuthModes))
 
 	return b
 }
