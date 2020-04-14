@@ -32,7 +32,13 @@ type TextField struct {
 }
 
 func NewTextField(name string) *TextField {
-	return &TextField{DataField: NewDataField(name)}
+	return &TextField{
+		DataField: NewDataField(name),
+		MinLength: -1,
+		MaxLength: -1,
+		MinWords:  -1,
+		MaxWords:  -1,
+	}
 }
 
 func (f *TextField) Compile() wajaf.NodeDef {
@@ -43,10 +49,18 @@ func (f *TextField) Compile() wajaf.NodeDef {
 	t.SetAttribute("classname", f.ClassName)
 	t.SetData(f.Title)
 	t.SetAttribute("size", f.Size)
-	t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
-	t.SetAttribute("maxlength", strconv.Itoa(f.MaxLength))
-	t.SetAttribute("minwords", strconv.Itoa(f.MinWords))
-	t.SetAttribute("maxwords", strconv.Itoa(f.MaxWords))
+	if f.MinLength >= 0 {
+		t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
+	}
+	if f.MaxLength >= 0 {
+		t.SetAttribute("maxlength", strconv.Itoa(f.MaxLength))
+	}
+	if f.MinWords >= 0 {
+		t.SetAttribute("minwords", strconv.Itoa(f.MinWords))
+	}
+	if f.MaxWords >= 0 {
+		t.SetAttribute("maxwords", strconv.Itoa(f.MaxWords))
+	}
 	t.SetAttribute("format", f.FormatJS)
 
 	t.SetAttribute("visible", createModes(f.AuthModes))
@@ -67,7 +81,7 @@ func (f *TextField) Compile() wajaf.NodeDef {
 	t.AddMessage("statuscheck", f.StatusCheck)
 
 	t.AddEvent("keyup", f.KeyUpJS)
-	t.AddEvent("blue", f.BlurJS)
+	t.AddEvent("blur", f.BlurJS)
 	t.AddEvent("focus", f.FocusJS)
 
 	return t

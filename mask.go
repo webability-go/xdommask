@@ -120,8 +120,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 		group.AddEvent("failure", m.FailureJS)
 	}
 
-	zcontrol := wajaf.NewGroupZone("group", "")
-	group.AddChild(zcontrol)
+	zcontrol := wajaf.NewGroupZone("control", "")
 
 	for _, f := range m.Fields {
 		if _, ok := f.(*ButtonField); ok {
@@ -138,6 +137,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 		h.SetData(val)
 		zcontrol.AddChild(h)
 	}
+	group.AddChild(zcontrol)
 
 	// Original dataset
 	if m.GetRecord != nil {

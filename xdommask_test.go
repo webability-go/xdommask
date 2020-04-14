@@ -3,7 +3,10 @@ package xdommask
 import (
 	"fmt"
 	"testing"
+	//	"encoding/xml"
+	"encoding/json"
 
+	"github.com/webability-go/wajaf"
 	"github.com/webability-go/xdominion"
 )
 
@@ -122,9 +125,18 @@ WA.toDOM('mastermaininstall|single|step3').className = 'installstepactual';
 	f8.TitleInsert = "##form.reset##"
 	mask.AddField(f8)
 
+	// from xdommask structure to wajaf object structures
 	stmask := mask.Compile()
 
-	fmt.Println("Structure mask:", mask)
+	app := wajaf.NewApplication("")
+	app.AddChild(stmask)
 
-	fmt.Println("Structure mask compile WAJAF:", stmask)
+	fmt.Println("Structure app compiled WAJAF:", app)
+
+	json, err := json.Marshal(app)
+	if err != nil {
+		fmt.Println("error json marshal", err)
+		return
+	}
+	fmt.Println("JSON CODE", string(json))
 }
