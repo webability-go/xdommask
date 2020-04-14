@@ -1,20 +1,71 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/webability-go/wajaf"
+)
 
 type TextAreaField struct {
 	*TextField
 }
 
 func NewTextAreaField(name string) *TextAreaField {
-	return &TextAreaField{TextField: NewTextField(name)}
+	ta := &TextAreaField{
+		TextField: NewTextField(name),
+	}
+	ta.MinLength = -1
+	ta.MaxLength = -1
+	ta.MinWords = -1
+	ta.MaxWords = -1
+	return ta
 }
 
 func (f *TextAreaField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewTextAreaFieldElement(f.ID)
+	t := wajaf.NewTextAreaFieldElement(f.ID)
 
-	return b
+	t.SetAttribute("style", f.Style)
+	t.SetAttribute("classname", f.ClassName)
+	t.SetData(f.Title)
+	t.SetAttribute("size", f.Size)
+	if f.MinLength >= 0 {
+		t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
+	}
+	if f.MaxLength >= 0 {
+		t.SetAttribute("maxlength", strconv.Itoa(f.MaxLength))
+	}
+	if f.MinWords >= 0 {
+		t.SetAttribute("minwords", strconv.Itoa(f.MinWords))
+	}
+	if f.MaxWords >= 0 {
+		t.SetAttribute("maxwords", strconv.Itoa(f.MaxWords))
+	}
+	t.SetAttribute("format", f.FormatJS)
+
+	t.SetAttribute("visible", createModes(f.AuthModes))
+	t.SetAttribute("info", createModes(f.ViewModes))
+	t.SetAttribute("readonly", createModes(f.ReadOnlyModes))
+	t.SetAttribute("notnull", createModes(f.NotNullModes))
+	t.SetAttribute("disabled", createModes(f.DisabledModes))
+	t.SetAttribute("helpmode", createModes(f.HelpModes))
+
+	t.AddHelp("", "", f.HelpDescription)
+	t.AddMessage("defaultvalue", fmt.Sprint(f.DefaultValue))
+	t.AddMessage("statusnotnull", f.StatusNotNull)
+	t.AddMessage("statusbadformat", f.StatusBadFormat)
+	t.AddMessage("statustooshort", f.StatusTooShort)
+	t.AddMessage("statustoolong", f.StatusTooLong)
+	t.AddMessage("statustoofewwords", f.StatusTooFewWords)
+	t.AddMessage("statustoomanywords", f.StatusTooManyWords)
+	t.AddMessage("statuscheck", f.StatusCheck)
+
+	t.AddEvent("keyup", f.KeyUpJS)
+	t.AddEvent("blur", f.BlurJS)
+	t.AddEvent("focus", f.FocusJS)
+
+	return t
 }
 
 /*

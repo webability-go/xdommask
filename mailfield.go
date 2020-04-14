@@ -12,21 +12,35 @@ type MailField struct {
 }
 
 func NewMailField(name string) *MailField {
-	return &MailField{TextField: NewTextField(name)}
+	ml := &MailField{
+		TextField: NewTextField(name),
+	}
+	ml.MinLength = -1
+	ml.MaxLength = -1
+	ml.MinWords = -1
+	ml.MaxWords = -1
+	return ml
 }
 
 func (f *MailField) Compile() wajaf.NodeDef {
 
 	t := wajaf.NewTextFieldElement(f.ID)
-
 	t.SetAttribute("style", f.Style)
 	t.SetAttribute("classname", f.ClassName)
 	t.SetData(f.Title)
 	t.SetAttribute("size", f.Size)
-	t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
-	t.SetAttribute("maxlength", strconv.Itoa(f.MaxLength))
-	t.SetAttribute("minwords", strconv.Itoa(f.MinWords))
-	t.SetAttribute("maxwords", strconv.Itoa(f.MaxWords))
+	if f.MinLength >= 0 {
+		t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
+	}
+	if f.MaxLength >= 0 {
+		t.SetAttribute("maxlength", strconv.Itoa(f.MaxLength))
+	}
+	if f.MinWords >= 0 {
+		t.SetAttribute("minwords", strconv.Itoa(f.MinWords))
+	}
+	if f.MaxWords >= 0 {
+		t.SetAttribute("maxwords", strconv.Itoa(f.MaxWords))
+	}
 	t.SetAttribute("format", f.FormatJS)
 
 	t.SetAttribute("visible", createModes(f.AuthModes))
@@ -47,9 +61,8 @@ func (f *MailField) Compile() wajaf.NodeDef {
 	t.AddMessage("statuscheck", f.StatusCheck)
 
 	t.AddEvent("keyup", f.KeyUpJS)
-	t.AddEvent("blue", f.BlurJS)
+	t.AddEvent("blur", f.BlurJS)
 	t.AddEvent("focus", f.FocusJS)
-
 	return t
 }
 
