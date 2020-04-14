@@ -16,6 +16,10 @@ TO DO:
 Version Changes Control
 =======================
 
+v0.0.4 - 2020-04-13
+------------------------
+- Modes on text adjusted. Node Name is same as ID by default. Do not send empty fields to the wajaf structure
+
 v0.0.3 - 2020-04-13
 ------------------------
 - some errors corrected on fields

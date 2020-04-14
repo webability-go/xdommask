@@ -33,7 +33,7 @@ type Field struct {
 }
 
 func NewField(name string) *Field {
-	return &Field{Name: name}
+	return &Field{Name: name, ID: name}
 }
 
 func (f *Field) Compile() wajaf.NodeDef {
