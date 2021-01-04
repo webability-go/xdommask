@@ -7,7 +7,9 @@ type VideoField struct {
 }
 
 func NewVideoField(name string) *VideoField {
-	return &VideoField{DataField: NewDataField(name)}
+	vf := &VideoField{DataField: NewDataField(name)}
+	vf.Type = FIELD
+	return vf
 }
 
 func (f *VideoField) Compile() wajaf.NodeDef {

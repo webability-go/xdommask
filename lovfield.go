@@ -7,7 +7,9 @@ type LOVField struct {
 }
 
 func NewLOVField(name string) *LOVField {
-	return &LOVField{LOOField: NewLOOField(name)}
+	lf := &LOVField{LOOField: NewLOOField(name)}
+	lf.Type = FIELD
+	return lf
 }
 
 func (f *LOVField) Compile() wajaf.NodeDef {

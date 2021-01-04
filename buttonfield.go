@@ -8,7 +8,9 @@ type ButtonField struct {
 }
 
 func NewButtonField(name string, action string) *ButtonField {
-	return &ButtonField{ControlField: NewControlField(name), Action: action}
+	bf := &ButtonField{ControlField: NewControlField(name), Action: action}
+	bf.Type = CONTROL
+	return bf
 }
 
 func (f *ButtonField) Compile() wajaf.NodeDef {

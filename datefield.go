@@ -7,31 +7,25 @@ import (
 	"github.com/webability-go/wajaf"
 )
 
-type TextAreaField struct {
+type DateField struct {
 	*TextField
-	Width  int
-	Height int
 }
 
-func NewTextAreaField(name string) *TextAreaField {
-	tf := &TextAreaField{
+func NewDateField(name string) *DateField {
+	df := &DateField{
 		TextField: NewTextField(name),
 	}
-	tf.Type = FIELD
-	tf.Width = 400
-	tf.Height = 100
-	return tf
+	df.Type = FIELD
+	return df
 }
 
-func (f *TextAreaField) Compile() wajaf.NodeDef {
+func (f *DateField) Compile() wajaf.NodeDef {
 
-	t := wajaf.NewTextAreaFieldElement(f.ID)
-
+	t := wajaf.NewTextFieldElement(f.ID)
 	t.SetAttribute("style", f.Style)
 	t.SetAttribute("classname", f.ClassName)
 	t.SetData(f.Title)
-	t.SetAttribute("areawidth", strconv.Itoa(f.Width))
-	t.SetAttribute("areaheight", strconv.Itoa(f.Height))
+	t.SetAttribute("size", f.Size)
 	if f.MinLength >= 0 {
 		t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
 	}
@@ -66,6 +60,5 @@ func (f *TextAreaField) Compile() wajaf.NodeDef {
 	t.AddEvent("keyup", f.KeyUpJS)
 	t.AddEvent("blur", f.BlurJS)
 	t.AddEvent("focus", f.FocusJS)
-
 	return t
 }

@@ -123,21 +123,24 @@ func (m *Mask) Compile() wajaf.NodeDef {
 	zcontrol := wajaf.NewGroupZone("control", "")
 
 	for _, f := range m.Fields {
-		if _, ok := f.(*ButtonField); ok {
+		if f.GetType() == CONTROL {
 			zcontrol.AddChild(f.Compile())
 			continue
 		}
-		z := wajaf.NewGroupZone("field", "")
+		z := wajaf.NewGroupZone(f.GetType(), "")
 		z.AddChild(f.Compile())
 		group.AddChild(z)
 	}
+	group.AddChild(zcontrol)
+
+	zhidden := wajaf.NewGroupZone("hidden", "")
 
 	for id, val := range m.Variables {
 		h := wajaf.NewHiddenFieldElement(id)
 		h.SetData(val)
-		zcontrol.AddChild(h)
+		zhidden.AddChild(h)
 	}
-	group.AddChild(zcontrol)
+	group.AddChild(zhidden)
 
 	// Original dataset
 	if m.GetRecord != nil {

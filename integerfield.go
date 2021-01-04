@@ -4,12 +4,15 @@ import "github.com/webability-go/wajaf"
 
 type IntegerField struct {
 	*TextField
-	Min int
-	Max int
+	Default int
+	Min     int
+	Max     int
 }
 
 func NewIntegerField(name string) *IntegerField {
-	return &IntegerField{TextField: NewTextField(name)}
+	inf := &IntegerField{TextField: NewTextField(name)}
+	inf.Type = FIELD
+	return inf
 }
 
 func (f *IntegerField) Compile() wajaf.NodeDef {

@@ -7,7 +7,9 @@ type LOOField struct {
 }
 
 func NewLOOField(name string) *LOOField {
-	return &LOOField{DataField: NewDataField(name)}
+	lf := &LOOField{DataField: NewDataField(name)}
+	lf.Type = FIELD
+	return lf
 }
 
 func (f *LOOField) Compile() wajaf.NodeDef {

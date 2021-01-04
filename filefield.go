@@ -2,17 +2,17 @@ package xdommask
 
 import "github.com/webability-go/wajaf"
 
-type ImageField struct {
+type FileField struct {
 	*DataField
 }
 
-func NewImageField(name string) *ImageField {
-	imf := &ImageField{DataField: NewDataField(name)}
-	imf.Type = FIELD
-	return imf
+func NewFileField(name string) *FileField {
+	ff := &FileField{DataField: NewDataField(name)}
+	ff.Type = FIELD
+	return ff
 }
 
-func (f *ImageField) Compile() wajaf.NodeDef {
+func (f *FileField) Compile() wajaf.NodeDef {
 
 	b := wajaf.NewMMCFieldElement("")
 

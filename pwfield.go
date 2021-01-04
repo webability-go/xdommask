@@ -12,14 +12,11 @@ type PWField struct {
 }
 
 func NewPWField(name string) *PWField {
-	pw := &PWField{
+	pf := &PWField{
 		TextField: NewTextField(name),
 	}
-	pw.MinLength = -1
-	pw.MaxLength = -1
-	pw.MinWords = -1
-	pw.MaxWords = -1
-	return pw
+	pf.Type = FIELD
+	return pf
 }
 
 func (f *PWField) Compile() wajaf.NodeDef {
