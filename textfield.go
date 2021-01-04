@@ -9,6 +9,7 @@ import (
 
 type TextField struct {
 	*DataField
+	DefaultValue string
 
 	Format   string
 	FormatJS string
@@ -32,13 +33,15 @@ type TextField struct {
 }
 
 func NewTextField(name string) *TextField {
-	return &TextField{
+	tf := &TextField{
 		DataField: NewDataField(name),
 		MinLength: -1,
 		MaxLength: -1,
 		MinWords:  -1,
 		MaxWords:  -1,
 	}
+	tf.Type = FIELD
+	return tf
 }
 
 func (f *TextField) Compile() wajaf.NodeDef {

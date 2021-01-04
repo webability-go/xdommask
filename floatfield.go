@@ -4,12 +4,15 @@ import "github.com/webability-go/wajaf"
 
 type FloatField struct {
 	*TextField
-	Min float64
-	Max float64
+	Default float64
+	Min     float64
+	Max     float64
 }
 
 func NewFloatField(name string) *FloatField {
-	return &FloatField{TextField: NewTextField(name)}
+	ff := &FloatField{TextField: NewTextField(name)}
+	ff.Type = FIELD
+	return ff
 }
 
 func (f *FloatField) Compile() wajaf.NodeDef {

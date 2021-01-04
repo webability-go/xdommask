@@ -12,14 +12,11 @@ type MailField struct {
 }
 
 func NewMailField(name string) *MailField {
-	ml := &MailField{
+	mf := &MailField{
 		TextField: NewTextField(name),
 	}
-	ml.MinLength = -1
-	ml.MaxLength = -1
-	ml.MinWords = -1
-	ml.MaxWords = -1
-	return ml
+	mf.Type = FIELD
+	return mf
 }
 
 func (f *MailField) Compile() wajaf.NodeDef {

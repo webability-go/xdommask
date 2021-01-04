@@ -2,8 +2,16 @@ package xdommask
 
 import "github.com/webability-go/wajaf"
 
+const (
+	CONTROL = "control"
+	FIELD   = "field"
+	INFO    = "info"
+	HIDDEN  = "hidden"
+)
+
 type FieldDef interface {
 	Compile() wajaf.NodeDef
+	GetType() string
 }
 
 type Field struct {
@@ -40,16 +48,19 @@ func (f *Field) Compile() wajaf.NodeDef {
 	return nil
 }
 
+func (f *Field) GetType() string {
+	return f.Type
+}
+
 type DataField struct {
 	*Field
 	InRecord    bool
 	URLVariable string
 
-	Title        string // title for editable, in button for control
-	Auto         bool
-	DefaultValue interface{}
-	Encoded      bool
-	Entities     bool
+	Title    string // title for editable, in button for control
+	Auto     bool
+	Encoded  bool
+	Entities bool
 
 	AutoMessage string
 

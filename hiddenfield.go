@@ -7,7 +7,9 @@ type HiddenField struct {
 }
 
 func NewHiddenField(name string) *HiddenField {
-	return &HiddenField{DataField: NewDataField(name)}
+	hf := &HiddenField{DataField: NewDataField(name)}
+	hf.Type = HIDDEN
+	return hf
 }
 
 func (f *HiddenField) Compile() wajaf.NodeDef {

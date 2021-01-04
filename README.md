@@ -16,6 +16,11 @@ TO DO:
 Version Changes Control
 =======================
 
+v0.0.7 - 2021-01-04
+------------------------
+- Implementation of type of field with constants (control, field, hidden, info)
+- Add NewInfoField to the list of known fields
+
 v0.0.6 - 2020-04-13
 ------------------------
 - mail, pw, textarea implemented
