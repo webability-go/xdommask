@@ -1,6 +1,19 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"crypto/md5"
+	"errors"
+	"fmt"
+	"net/url"
+	"strings"
+
+	"golang.org/x/net/html"
+
+	"github.com/webability-go/wajaf"
+	"github.com/webability-go/xdominion"
+
+	"github.com/webability-go/xamboo/cms/context"
+)
 
 const (
 	CONTROL = "control"
@@ -12,6 +25,15 @@ const (
 type FieldDef interface {
 	Compile() wajaf.NodeDef
 	GetType() string
+	GetName() string
+	GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error)
+	ConvertValue(value interface{}) (interface{}, error)
+	PreInsert(ctx *context.Context, rec *xdominion.XRecord) error
+	PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error
+	PreUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
+	PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
+	PreDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
+	PostDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
 }
 
 type Field struct {
@@ -35,9 +57,9 @@ type Field struct {
 	TabIndex        int
 	Size            string
 
-	JS    string
-	Focus string
-	Blur  string
+	CheckJS string
+	Focus   string
+	Blur    string
 }
 
 func NewField(name string) *Field {
@@ -52,24 +74,67 @@ func (f *Field) GetType() string {
 	return f.Type
 }
 
+func (f *Field) GetName() string {
+	return f.Name
+}
+
+func (f *Field) GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error) {
+	if DEBUG {
+		fmt.Println("xdominion.Field::GetValue", mode, "field ignored by construct")
+	}
+	return nil, true, nil
+}
+
+// ConvertValue will convert the entry value to the correct type for this field
+func (f *Field) ConvertValue(value interface{}) (interface{}, error) {
+	if DEBUG {
+		fmt.Println("xdominion.Field::ConvertValue", value)
+	}
+	return value, nil
+}
+
+func (f *Field) PreInsert(ctx *context.Context, rec *xdominion.XRecord) error {
+	return nil
+}
+
+func (f *Field) PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error {
+	return nil
+}
+
+func (f *Field) PreUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error {
+	return nil
+}
+
+func (f *Field) PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error {
+	return nil
+}
+
+func (f *Field) PreDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error {
+	return nil
+}
+
+func (f *Field) PostDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error {
+	return nil
+}
+
 type DataField struct {
 	*Field
 	InRecord    bool
 	URLVariable string
 
-	Title    string // title for editable, in button for control
-	Auto     bool
+	Title        string
+	DefaultValue string
+
+	Auto        bool
+	AutoMessage string
+
 	Encoded  bool
 	Entities bool
 
-	AutoMessage string
-
-	EmptyNotNull bool
 	NullOnEmpty  bool
 	NullValue    string
 	MD5Encrypted bool
 
-	StatusOK      string
 	StatusNotNull string
 	StatusCheck   string
 }
@@ -80,6 +145,57 @@ func NewDataField(name string) *DataField {
 
 func (f *DataField) Compile() wajaf.NodeDef {
 	return nil
+}
+
+// GetValue to get the value from the field when needed. return value, ignored bool (true = ignored by construct)
+// return ONLY string or nil
+func (f *DataField) GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error) {
+
+	if DEBUG {
+		fmt.Println("xdominion.DataField::GetValue", f.Name, mode)
+	}
+
+	// CAN BE USED?
+	//	if !f.InRecord {
+	//		return nil, true, nil
+	//	}
+	if f.AuthModes&mode == 0 {
+		return nil, true, nil
+	}
+	if f.ViewModes&mode != 0 {
+		return nil, true, nil
+	}
+
+	// BUILD VALUE
+	sval := ""
+	if (mode&INSERT != 0) && f.Auto {
+		sval = f.DefaultValue
+	} else {
+		sval = ctx.Request.Form.Get(f.URLVariable)
+	}
+	// NOT NULL ?
+	if sval == "" && (f.NotNullModes&mode != 0) {
+		return nil, false, errors.New(f.StatusNotNull)
+	}
+
+	if f.NullOnEmpty && sval == "" {
+		return nil, false, nil
+	}
+
+	// FILTER VALUE
+	if sval != "" {
+		if f.Entities {
+			sval = html.EscapeString(sval)
+		}
+		if f.Encoded {
+			sval = strings.Replace(url.QueryEscape(sval), "+", "%20", -1)
+		}
+		if f.MD5Encrypted {
+			data := []byte(sval)
+			sval = fmt.Sprintf("%x", md5.Sum(data))
+		}
+	}
+	return sval, false, nil
 }
 
 type ControlField struct {
@@ -100,49 +216,6 @@ func (f *ControlField) Compile() wajaf.NodeDef {
 }
 
 /*
-/*
-class DomMaskField extends \core\WAClass
-{
-  protected $DomMask;                  // the DomMask that owns us
-  protected $caller;
-  public $calcfunction = null;       // function to calculate the value(s) of the field based on the value from table
-
-
-  public function __construct($name, $inrecord)
-  {
-    parent::__construct();
-    $this->name = $name;
-    $this->inrecord = $inrecord;
-    $this->urlvariable = $name; // by default, name of field
-  }
-
-  public function fix($DomMask, $caller)
-  {
-    $this->DomMask = $DomMask;
-    $this->caller = $caller;
-  }
-
-  public function needEncType()
-  {
-    // replace this method in your extended field to get back true if enctype is needed in the form: file, image, etc.
-    return false;
-  }
-
-
-  public function gettitle()
-  {
-    return $this->title;
-  }
-
-  public function getType()
-  {
-    return $this->type;
-  }
-
-  public function getMessages()
-  {
-    return $this->helpdescription;
-  }
 
   // VARIABLES functions
   // gets the value from DATABASE (record array) or DEFAULT or FUNCTION
@@ -193,100 +266,4 @@ class DomMaskField extends \core\WAClass
     return $val;
   }
 
-  // format the value from URL
-  protected function formatField($val)
-  {
-    if ($this->encoded)
-      $val = rawurldecode($val);
-    if ($this->entities)
-      $val = nl2br(htmlentities($val, ENT_COMPAT, $this->DomMask->CharSet));
-    else
-    {
-      $val = nl2br($val);
-    }
-    return $val;
-  }
-
-  protected function filterParameter($val)
-  {
-    if ($val !== null && $val!="")
-    {
-      if ($this->entities)
-        $val = htmlentities($val, ENT_COMPAT, $this->DomMask->CharSet);
-      if ($this->encoded)
-        $val = rawurlencode($val);
-      if ($this->md5encrypted && $this->DomMask->realmode == DomMask::INSERT)  // MD5 only apply on INSERT (cannot change on update ?)
-        $val = MD5($val);
-      if ($this->maxlength)
-        $val=substr($val, 0, $this->maxlength);
-    }
-    return $val;
-  }
-
-  // get and filter the parameter from URL
-  public function getParameter()
-  {
-    $val = $this->DomMask->getParameter($this->urlvariable);
-    if ($this->format)
-    {
-      if (!preg_match($this->format, $val))
-        $val = null;
-    }
-    if ($this->nullonempty && !$val)
-    { $val = null; }
-    if ($this->emptyonnull && !$val)
-    { $val = ''; }
-    return $this->filterParameter($val);
-  }
-
-  // CONTROL functions, do nothing by default, are called by DomMask
-  public function preInsert($record) // record is a DB_Record, by ref
-  {
-  }
-
-  public function postInsert($key, $record)
-  {
-  }
-
-  public function preUpdate($key, $record, $oldrecord) // record is a DB_Record, by ref
-  {
-  }
-
-  public function postUpdate($key, $record, $oldrecord)
-  {
-  }
-
-  public function preDelete($key, $oldrecord)
-  {
-  }
-
-  public function postDelete($key, $oldrecord)
-  {
-  }
-
-  // 4GL method to create a wajaffield object
-  public function create()
-  {
-    return null;
-  }
-
-  public function loadDefinition($data)
-  {
-    foreach($data as $p => $v)
-    {
-      if ($p == 'type')
-        continue;
-      if (is_array($v))
-      {
-        $t = array();
-        foreach($v as $p1 => $v1)
-          $t[constant('DomMask::'. $p1)] = $v1;
-        $this->$p = $t;
-      }
-      else
-        $this->$p = $v;
-    }
-  }
-
-}
 */

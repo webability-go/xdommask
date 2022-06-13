@@ -1,87 +1,92 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"fmt"
 
+	"github.com/webability-go/wajaf"
+	"github.com/webability-go/xdominion"
+)
+
+// List Of Values field:
+// it is static. The list comes as tags. Can come from table or array of values, can be reloaded with a listener (sub-list)
 type LOVField struct {
-	*LOOField
+	*DataField
+	DefaultValue string
+	Options      map[string]string
+	MultiSelect  bool
+
+	Table      *xdominion.XTable
+	Order      *xdominion.XOrder
+	Conditions *xdominion.XConditions
+	FieldSet   *xdominion.XFieldSet
+
+	FocusJS  string
+	BlurJS   string
+	ChangeJS string
 }
 
 func NewLOVField(name string) *LOVField {
-	lf := &LOVField{LOOField: NewLOOField(name)}
+	lf := &LOVField{DataField: NewDataField(name)}
 	lf.Type = FIELD
 	return lf
 }
 
 func (f *LOVField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewLOVFieldElement(f.ID)
+	l := wajaf.NewLOVFieldElement(f.ID)
 
-	return b
+	l.SetAttribute("style", f.Style)
+	l.SetAttribute("classname", f.ClassName)
+	l.SetData(f.Title)
+	l.SetAttribute("size", f.Size)
+
+	l.SetAttribute("visible", convertModes(f.AuthModes))
+	l.SetAttribute("info", convertModes(f.ViewModes))
+	l.SetAttribute("readonly", convertModes(f.ReadOnlyModes))
+	l.SetAttribute("notnull", convertModes(f.NotNullModes))
+	l.SetAttribute("disabled", convertModes(f.DisabledModes))
+	l.SetAttribute("helpmode", convertModes(f.HelpModes))
+
+	l.AddHelp("", "", f.HelpDescription)
+	l.AddMessage("defaultvalue", fmt.Sprint(f.DefaultValue))
+	l.AddMessage("statusnotnull", f.StatusNotNull)
+	l.AddMessage("statuscheck", f.StatusCheck)
+
+	if f.BlurJS != "" {
+		l.AddEvent("blur", f.BlurJS)
+	}
+	if f.FocusJS != "" {
+		l.AddEvent("focus", f.FocusJS)
+	}
+	if f.ChangeJS != "" {
+		l.AddEvent("change", f.ChangeJS)
+	}
+	if f.CheckJS != "" {
+		l.AddChild(wajaf.NewCodeNode("", "check", f.CheckJS))
+	}
+
+	ms := "yes"
+	if !f.MultiSelect {
+		ms = "no"
+	}
+	l.SetAttribute("multiselect", ms)
+	opts := wajaf.NewOptions()
+	// Table ?
+	if f.Table != nil {
+		recs, _ := f.Table.SelectAll(f.Conditions, f.Order, f.FieldSet)
+		if recs != nil {
+			for _, rec := range *recs {
+				p, _ := rec.GetString((*f.FieldSet)[0])
+				v, _ := rec.GetString((*f.FieldSet)[1])
+				opts.AddChild(wajaf.NewOption(p, p+" / "+v))
+			}
+		}
+	} else if f.Options != nil {
+		for p, v := range f.Options {
+			opts.AddChild(wajaf.NewOption(p, v))
+		}
+	}
+	l.AddChild(opts)
+
+	return l
 }
-
-/*
-class DomMaskLOVField extends DomMaskField
-{
-  public $RadioButton = false;      // boolean
-  public $MultiSelect = false;      // boolean
-
-  public $ListTable = null;         // List DB_Table object
-  public $ListKey = null;           // the key field on list
-  public $ListName = null;          // the name field on list
-  public $ListOrder = null;         // field order by on list
-  public $ListWhere = null;         // where object on list
-  public $ListSeparator = ' / ';    // separator if the list name is an array
-  public $ListEncoded = false;      // boolean true if the list result is encoded
-  public $ListEntities = false;     // boolean true if the list result has entities
-  public $Controlling = null;       // this LOV controls another LOV (Id of the FIELD)
-  public $ControllingOptions = null; // The special options (array( father => array(childs => childs) ) )
-  public $ControllingIndex = null;   // the tabindex of the controlled field, used to actualize field validity
-  public $OnEvent = null;            // If a DB_MaskField::LOO or DB_MaskField::LOV have a javascript event
-
-  function __construct($MF = null)
-  {
-    $name = ""; $iftable = false;
-    if ($MF)
-    {
-      $name = $MF->Name;
-      $iftable = $MF->IfTable;
-      if ($MF instanceof DomMaskLOVField)
-      {
-        $this->RadioButton = $MF->RadioButton;
-        $this->MultiSelect = $MF->MultiSelect;
-        $this->ListTable = $MF->ListTable;
-        $this->ListKey = $MF->ListKey;
-        $this->ListName = $MF->ListName;
-        $this->ListEncoded = $MF->ListEncoded;
-        $this->ListEntities = $MF->ListEntities;
-        $this->ListWhere = $MF->ListWhere;
-        $this->ListOrder = $MF->ListOrder;
-        $this->ListSeparator = $MF->ListSeparator;
-        $this->Controlling = $MF->Controlling;
-        $this->ControllingOptions = $MF->ControllingOptions;
-        $this->ControllingIndex = $MF->ControllingIndex;
-        $this->OnEvent = $MF->OnEvent;
-      }
-    }
-    parent::__construct($name, $iftable, DB_MaskField::LOV, $MF);
-  }
-
-  public function create()
-  {
-    $f = new \wajaf\dommasklovfieldElement();
-    $f->setLink($this->DomMask->RealMaskId);
-    $f->setMessage('title', $this->Title);
-    $f->setMessage('helpsummary', $this->HelpSummary);
-    $f->setMessage('helptitle', $this->HelpTitle);
-    $f->setMessage('helpdescription', $this->HelpDescription);
-    $f->setMessage('statusok', $this->StatusOK);
-    $f->setMessage('statusnotnull', $this->StatusNotNull);
-    $f->setMessage('statuscheck', $this->StatusCheck);
-    $f->setNotnull($this->NotNull);
-
-    return $f;
-  }
-
-}
-
-*/

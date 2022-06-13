@@ -2,10 +2,13 @@ package xdommask
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/webability-go/wajaf"
 	"github.com/webability-go/xdominion"
+
+	"github.com/webability-go/xamboo/cms/context"
 )
 
 type Mode int
@@ -21,7 +24,27 @@ const (
 	CONFIRMDELETE
 )
 
+type MaskHooks struct {
+	Build func(m *Mask, ctx *context.Context) error
+
+	GetRecord func(m *Mask, ctx *context.Context, key interface{}, mode int) (string, *xdominion.XRecord, error)
+
+	PreInsert  func(m *Mask, ctx *context.Context, rec *xdominion.XRecord) error
+	Insert     func(m *Mask, ctx *context.Context, rec *xdominion.XRecord) (interface{}, error)
+	PostInsert func(m *Mask, ctx *context.Context, key interface{}, rec *xdominion.XRecord) error
+
+	PreUpdate  func(m *Mask, ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
+	Update     func(m *Mask, ctx *context.Context, key interface{}, newrec *xdominion.XRecord) error
+	PostUpdate func(m *Mask, ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
+
+	PreDelete  func(m *Mask, ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
+	Delete     func(m *Mask, ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
+	PostDelete func(m *Mask, ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
+}
+
 type Mask struct {
+	Hooks MaskHooks
+
 	ID string
 
 	Display       string
@@ -32,9 +55,11 @@ type Mask struct {
 	VarOrder      string
 	VarKey        string
 
-	Mode      Mode
-	AuthModes Mode
-	Key       interface{}
+	Mode        Mode
+	AuthModes   Mode
+	KeyField    string
+	Key         interface{}
+	InsertedKey interface{}
 
 	Variables map[string]string
 	SuccessJS string
@@ -54,22 +79,19 @@ type Mask struct {
 	Counter int
 	Fields  []FieldDef
 
-	// Hooks
-	PreInsert  func(*Mask, *xdominion.XRecord) error
-	Insert     func(*Mask, *xdominion.XRecord) error
-	PostInsert func(*Mask, *xdominion.XRecord) error
-	PreUpdate  func(*Mask, *xdominion.XRecord) error
-	Update     func(*Mask, *xdominion.XRecord) error
-	PostUpdate func(*Mask, *xdominion.XRecord) error
-	PreDelete  func(*Mask, *xdominion.XRecord) error
-	Delete     func(*Mask, *xdominion.XRecord) error
-	PostDelete func(*Mask, *xdominion.XRecord) error
-	GetRecord  func(*Mask) *xdominion.XRecord
+	Table      *xdominion.XTable
+	Order      *xdominion.XOrder
+	Conditions *xdominion.XConditions
+	FieldSet   *xdominion.XFieldSet
 }
 
-func NewMask(id string) *Mask {
-	return &Mask{
+func NewMask(id string, hooks MaskHooks, ctx *context.Context) (*Mask, error) {
+	if DEBUG {
+		fmt.Println("xdominion.NewMask", id)
+	}
+	m := &Mask{
 		ID:        id,
+		Hooks:     hooks,
 		Variables: map[string]string{},
 		Fields:    []FieldDef{},
 		VarMode:   "Mode",
@@ -77,14 +99,26 @@ func NewMask(id string) *Mask {
 		VarKey:    "Key",
 		Counter:   1,
 	}
+	var err error
+	if m.Hooks.Build != nil {
+		err = m.Hooks.Build(m, ctx)
+	}
+	return m, err
 }
 
 func (m *Mask) AddField(f FieldDef) {
+	if DEBUG {
+		fmt.Println("xdominion.Mask::AddField", f.GetName())
+	}
 	m.Fields = append(m.Fields, f)
 }
 
-func (m *Mask) Compile() wajaf.NodeDef {
+func (m *Mask) Compile(mode string, ctx *context.Context) wajaf.NodeDef {
 
+	if DEBUG {
+		fmt.Println("xdominion.Mask::Compile", mode)
+	}
+	mode = verifyMode(mode)
 	group := wajaf.NewGroupContainer(m.ID)
 	group.SetAttribute("display", m.Display)
 	group.SetAttribute("style", m.Style)
@@ -96,8 +130,8 @@ func (m *Mask) Compile() wajaf.NodeDef {
 	group.SetAttribute("varorder", m.VarOrder)
 	group.SetAttribute("varkey", m.VarKey)
 
-	group.SetAttribute("authmodes", createModes(m.AuthModes))
-	group.SetAttribute("mode", createModes(m.Mode))
+	group.SetAttribute("authmodes", convertModes(m.AuthModes))
+	group.SetAttribute("mode", mode)
 	if m.Key != nil {
 		group.SetAttribute("key", fmt.Sprint(m.Key))
 	}
@@ -123,7 +157,7 @@ func (m *Mask) Compile() wajaf.NodeDef {
 	zcontrol := wajaf.NewGroupZone("control", "")
 
 	for _, f := range m.Fields {
-		if f.GetType() == CONTROL {
+		if f.GetType() == CONTROL || f.GetType() == INFO {
 			zcontrol.AddChild(f.Compile())
 			continue
 		}
@@ -143,20 +177,513 @@ func (m *Mask) Compile() wajaf.NodeDef {
 	group.AddChild(zhidden)
 
 	// Original dataset
-	if m.GetRecord != nil {
-		rec := m.GetRecord(m)
-		if rec != nil {
-			// rec must be a JSON
-			jsonrec, _ := json.Marshal(rec)
-			zdata := wajaf.NewGroupDataset("", string(jsonrec))
-			group.AddChild(zdata)
-		}
+	var rec *xdominion.XRecord
+	if m.Hooks.GetRecord != nil {
+		_, rec, _ = m.Hooks.GetRecord(m, ctx, m.Key, 0)
+	} else {
+		_, rec, _ = m.getrecord(m.Key, 0)
 	}
-
+	if rec != nil {
+		// rec must be a JSON
+		jsonrec, _ := json.Marshal(rec)
+		zdata := wajaf.NewGroupDataset("", string(jsonrec))
+		group.AddChild(zdata)
+	}
 	return group
 }
 
-func createModes(mode Mode) string {
+func builRunMessage(data map[string]interface{}, messages map[string]string, err error) (map[string]interface{}, error) {
+	if err != nil {
+		if messages["text"] != "" {
+			messages["text"] += "<br />\n"
+		}
+		messages["text"] += err.Error()
+	}
+	data["success"] = false
+	data["message"] = messages
+	return data, err
+}
+
+func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
+
+	order := ctx.Request.Form.Get(m.VarOrder)
+	if DEBUG {
+		fmt.Println("xdominion.Mask::Run", order)
+	}
+
+	messages := map[string]string{"text": ""}
+	data := map[string]interface{}{}
+	recdata := map[string]interface{}{}
+	var err error
+
+	nkey := ""
+	var rec *xdominion.XRecord
+	switch order {
+	case "getrecord":
+		key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+		fmt.Printf("GetRecord %#v\n", key)
+		if m.Hooks.GetRecord != nil {
+			nkey, rec, err = m.Hooks.GetRecord(m, ctx, key, 0)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		} else {
+			nkey, rec, err = m.getrecord(key, 0)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		}
+		if rec != nil {
+			recdata[nkey] = rec
+			data["data"] = recdata
+		}
+	case "first":
+		if m.Hooks.GetRecord != nil {
+			nkey, rec, err = m.Hooks.GetRecord(m, ctx, "", -2)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		} else {
+			nkey, rec, err = m.getrecord("", -2)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		}
+		if rec != nil {
+			recdata[nkey] = rec
+			data["data"] = recdata
+		}
+	case "previous":
+		key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+		if m.Hooks.GetRecord != nil {
+			nkey, rec, err = m.Hooks.GetRecord(m, ctx, key, -1)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		} else {
+			nkey, rec, err = m.getrecord(key, -1)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		}
+		if rec != nil {
+			recdata[nkey] = rec
+			data["data"] = recdata
+		}
+	case "next":
+		key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+		if m.Hooks.GetRecord != nil {
+			nkey, rec, err = m.Hooks.GetRecord(m, ctx, key, 1)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		} else {
+			nkey, rec, err = m.getrecord(key, 1)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		}
+		if rec != nil {
+			recdata[nkey] = rec
+			data["data"] = recdata
+		}
+	case "last":
+		if m.Hooks.GetRecord != nil {
+			nkey, rec, err = m.Hooks.GetRecord(m, ctx, "", 2)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		} else {
+			nkey, rec, err = m.getrecord("", 2)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
+		}
+		if rec != nil {
+			recdata[nkey] = rec
+			data["data"] = recdata
+		}
+	case "submit":
+		mode := ctx.Request.Form.Get(m.VarMode)
+		realmode, formmode := createMode(mode)
+
+		key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+		if DEBUG {
+			fmt.Println("xdominion.Mask::Run@submit", key, realmode, formmode)
+		}
+		fieldmessages := map[string]string{}
+		rec, fieldmessages, err = m.execute(ctx, realmode, formmode, key)
+		if err != nil {
+			return builRunMessage(data, messages, err)
+		}
+		data["message"] = messages
+		data["messages"] = fieldmessages
+		data["rec"] = rec
+		/*
+		   		if ($this->mode == 1)
+		   			$this->realmode = DomMask::DOINSERT;
+		   		elseif ($this->mode == 2)
+		   		{
+		   			$this->realmode = DomMask::DOUPDATE;
+		   			$this->key = $this->getParameter($this->varkey);
+		   		}
+		   		elseif ($this->mode == 3)
+		   		{
+		   			$this->realmode = DomMask::DODELETE;
+		   			$this->key = $this->getParameter($this->varkey);
+		   		}
+		   		$this->execute();
+		   		$data = array('success' => true, 'messages' => array('text' => 'Exito'));
+
+		   S//*************** NOTE: SHOULD GETS BACK THE FINAL RECORD FOR IF THERE ARE SOME CALCULATED FIELDS (LIKE IMAGES NAMES; SUM FIELDS; LINKS, PATHS, ETC)
+
+		*/
+
+		//	case "image":
+		/*
+			$key = $this->getParameter($this->varkey);
+			$field = $this->getParameter($this->varfield);
+			// gives the control to the field
+			foreach($this->fields as $f)
+				if ($f->name == $field)
+					$data = $f->prepareImage();
+			break;
+		*/
+	}
+	data["success"] = true
+	return data, nil
+}
+
+func (m *Mask) getrecord(key interface{}, mode int) (string, *xdominion.XRecord, error) {
+
+	if m.Table == nil {
+		return "", nil, nil
+	}
+	primkey := m.Table.GetPrimaryKey()
+	primkeyname := primkey.GetName()
+	// build QUERY
+	if mode == 0 {
+		rec, err := m.Table.SelectOne(key, m.FieldSet)
+		rkey := ""
+		if rec != nil {
+			rkey, _ = rec.GetString(primkeyname)
+		}
+		return rkey, rec, err
+	}
+	if mode == -2 {
+		rec, err := m.Table.SelectOne(m.Conditions, m.Order, m.FieldSet)
+		rkey := ""
+		if rec != nil {
+			rkey, _ = rec.GetString(primkeyname)
+		}
+		return rkey, rec, err
+	}
+	if mode == 2 {
+		// revert order
+		var neworder xdominion.XOrder
+		if m.Order != nil {
+			neworder = revertOrder(*m.Order)
+		}
+		rec, err := m.Table.SelectOne(m.Conditions, neworder, m.FieldSet)
+		rkey := ""
+		if rec != nil {
+			rkey, _ = rec.GetString(primkeyname)
+		}
+		return rkey, rec, err
+	}
+	if mode == -1 {
+		// revert order
+		var neworder xdominion.XOrder
+		if m.Order != nil {
+			neworder = revertOrder(*m.Order)
+		}
+		var newconditions xdominion.XConditions
+		if m.Conditions != nil {
+			newconditions = m.Conditions.Clone()
+			if len(newconditions) > 0 {
+				newconditions = append(newconditions, xdominion.NewXCondition(primkeyname, "<", key, "and"))
+			} else {
+				newconditions = append(newconditions, xdominion.NewXCondition(primkeyname, "<", key))
+			}
+		} else {
+			newconditions = xdominion.XConditions{xdominion.NewXCondition(primkeyname, "<", key)}
+		}
+		rec, err := m.Table.SelectOne(newconditions, neworder, m.FieldSet)
+		rkey := ""
+		if rec != nil {
+			rkey, _ = rec.GetString(primkeyname)
+		}
+		return rkey, rec, err
+	}
+	if mode == 1 {
+		var newconditions xdominion.XConditions
+		if m.Conditions != nil {
+			newconditions = m.Conditions.Clone()
+			if len(newconditions) > 0 {
+				newconditions = append(newconditions, xdominion.NewXCondition(primkeyname, ">", key, "and"))
+			} else {
+				newconditions = append(newconditions, xdominion.NewXCondition(primkeyname, ">", key))
+			}
+		} else {
+			newconditions = xdominion.XConditions{xdominion.NewXCondition(primkeyname, ">", key)}
+		}
+		rec, err := m.Table.SelectOne(newconditions, m.Order, m.FieldSet)
+		rkey := ""
+		if rec != nil {
+			rkey, _ = rec.GetString(primkeyname)
+		}
+		return rkey, rec, err
+	}
+	return "", nil, nil
+}
+
+func (m *Mask) execute(ctx *context.Context, realmode Mode, formmode Mode, key interface{}) (*xdominion.XRecord, map[string]string, error) {
+
+	messages := map[string]string{}
+	record := m.buildrecord(ctx, formmode)
+	switch realmode {
+	case DOINSERT:
+		if DEBUG {
+			fmt.Println("xdominion.Mask::execute-->DOINSERT", realmode, formmode, key, record)
+		}
+		var err error
+		if m.Hooks.PreInsert != nil {
+			err = m.Hooks.PreInsert(m, ctx, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok := true
+		for _, f := range m.Fields {
+			err = f.PreInsert(ctx, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on pre fields. Please check the form.")
+		}
+		var key interface{}
+		if m.Hooks.Insert != nil {
+			key, err = m.Hooks.Insert(m, ctx, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		} else {
+			key, err = m.insert(ctx, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok = true
+		for _, f := range m.Fields {
+			err = f.PostInsert(ctx, key, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on post fields. Please check the form.")
+		}
+		if m.Hooks.PostInsert != nil {
+			err = m.Hooks.PostInsert(m, ctx, key, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+	case DOUPDATE:
+		if DEBUG {
+			fmt.Println("xdominion.Mask::execute-->DOUPDATE", realmode, formmode, key, record)
+		}
+		var oldrecord *xdominion.XRecord
+		var err error
+		if m.Hooks.GetRecord != nil {
+			_, oldrecord, err = m.Hooks.GetRecord(m, ctx, key, 0)
+			if err != nil {
+				return nil, messages, err
+			}
+		} else {
+			_, oldrecord, err = m.getrecord(key, 0)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		if m.Hooks.PreUpdate != nil {
+			err := m.Hooks.PreUpdate(m, ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok := true
+		for _, f := range m.Fields {
+			err = f.PreUpdate(ctx, key, oldrecord, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on pre fields. Please check the form.")
+		}
+		if m.Hooks.Update != nil {
+			err := m.Hooks.Update(m, ctx, key, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		} else {
+			err := m.update(ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok = true
+		for _, f := range m.Fields {
+			err := f.PostUpdate(ctx, key, oldrecord, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on post fields. Please check the form.")
+		}
+		if m.Hooks.PostUpdate != nil {
+			err := m.Hooks.PostUpdate(m, ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+	case DODELETE:
+		if DEBUG {
+			fmt.Println("xdominion.Mask::execute-->DODELETE", realmode, formmode, key, record)
+		}
+		var oldrecord *xdominion.XRecord
+		var err error
+		if m.Hooks.GetRecord != nil {
+			_, oldrecord, err = m.Hooks.GetRecord(m, ctx, key, 0)
+			if err != nil {
+				return nil, messages, err
+			}
+		} else {
+			_, oldrecord, err = m.getrecord(key, 0)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		if m.Hooks.PreDelete != nil {
+			err := m.Hooks.PreDelete(m, ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok := true
+		for _, f := range m.Fields {
+			err := f.PreDelete(ctx, key, oldrecord, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on pre fields. Please check the form.")
+		}
+		if m.Hooks.Delete != nil {
+			err := m.Hooks.Delete(m, ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		} else {
+			err := m.delete(ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+		isok = true
+		for _, f := range m.Fields {
+			err := f.PostDelete(ctx, key, oldrecord, record)
+			if err != nil {
+				isok = false
+				messages[f.GetName()] = err.Error()
+			}
+		}
+		if !isok {
+			return nil, messages, errors.New("Error on post fields. Please check the form.")
+		}
+		if m.Hooks.PostDelete != nil {
+			err := m.Hooks.PostDelete(m, ctx, key, oldrecord, record)
+			if err != nil {
+				return nil, messages, err
+			}
+		}
+	}
+	return nil, messages, nil
+}
+
+func (m *Mask) buildrecord(ctx *context.Context, mode Mode) *xdominion.XRecord {
+	// we loop over the fields
+	record := &xdominion.XRecord{}
+	for _, f := range m.Fields {
+		if f.GetType() == CONTROL {
+			continue
+		}
+		v, ignore, _ := f.GetValue(ctx, mode)
+		if ignore {
+			continue
+		}
+		record.Set(f.GetName(), v)
+	}
+	return record
+}
+
+func (m *Mask) insert(ctx *context.Context, rec *xdominion.XRecord) (interface{}, error) {
+
+	if m.Table == nil {
+		return nil, nil
+	}
+	key, err := m.Table.Insert(rec)
+	return key, err
+}
+
+func (m *Mask) update(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error {
+	if m.Table == nil {
+		return nil
+	}
+	_, err := m.Table.Update(key, newrec)
+	return err
+}
+
+func (m *Mask) delete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, params *xdominion.XRecord) error {
+
+	fmt.Println("Mask::delete", key, oldrec, params)
+
+	if m.Table == nil {
+		return nil
+	}
+	_, err := m.Table.Delete(key)
+	return err
+}
+
+func (m *Mask) convertPrimaryKey(value interface{}) interface{} {
+	if m.KeyField == "" {
+		return value
+	}
+	for _, f := range m.Fields {
+		if f.GetName() == m.KeyField {
+			nv, err := f.ConvertValue(value)
+			if err == nil {
+				return nv
+			}
+		}
+	}
+	return value
+}
+
+// ==============================================
+// TOOLS for mask
+// ==============================================
+func convertModes(mode Mode) string {
 	f := ""
 	if mode&INSERT == INSERT {
 		f += "1"
@@ -171,6 +698,40 @@ func createModes(mode Mode) string {
 		f += "4"
 	}
 	return f
+}
+
+func createMode(mode string) (Mode, Mode) {
+	fmt.Println("Mask::createMode", mode)
+	switch mode {
+	case "1":
+		return DOINSERT, INSERT
+	case "2":
+		return DOUPDATE, UPDATE
+	case "3":
+		return DODELETE, DELETE
+	default:
+		return VIEW, VIEW
+	}
+}
+
+func verifyMode(mode string) string {
+	if mode != "1" && mode != "2" && mode != "3" && mode != "4" {
+		mode = "4"
+	}
+	return mode
+}
+
+func revertOrder(order xdominion.XOrder) xdominion.XOrder {
+
+	norder := order.Clone()
+	for i, o := range norder {
+		if o.Operator == xdominion.ASC {
+			norder[i].Operator = xdominion.DESC
+		} else {
+			norder[i].Operator = xdominion.ASC
+		}
+	}
+	return norder
 }
 
 /*
@@ -418,60 +979,6 @@ class DomMask extends \core\WAClass
   }
 
   // will return the necesary data based on context for JSON and 4GL
-  private function execute()
-  {
-    switch($this->realmode)
-    {
-      case DomMask::DOINSERT:
-        // BUILD RAW RECORD
-        $record = $this->__buildrecord(1);
-        // PREINSERT
-        $this->preInsert($record);
-        foreach ($this->fields as $K => $F)
-          $F->preInsert($record);
-        // INSERT
-        $this->insertedkey = $this->Insert($record);
-        // POSTINSERT
-        foreach ($this->fields as $K => $F)
-          $F->postInsert($this->insertedkey, $record);
-        $this->postInsert($this->insertedkey, $record);
-        $this->key = $this->insertedkey;
-        $this->execmessages = $this->actionmessages[DomMask::DOINSERT];
-        break;
-      case DomMask::DOUPDATE:
-        // GET OLD RECORD
-        $oldrecord = $this->getRecord($this->key);
-        // BUILD RAW RECORD
-        $record = $this->__buildrecord(2);
-        // PREUPDATE
-        $this->preUpdate($this->key, $record, $oldrecord);
-        foreach ($this->fields as $K => $F)
-          $F->preUpdate($this->key, $record, $oldrecord);
-        // UPDATE
-        $this->Update($this->key, $record, $oldrecord);
-        // POST UPDATE
-        foreach ($this->fields as $K => $F)
-          $F->postUpdate($this->key, $record, $oldrecord);
-        $this->postUpdate($this->key, $record, $oldrecord);
-        $this->execmessages = $this->actionmessages[DomMask::DOUPDATE];
-        break;
-      case DomMask::DODELETE:
-        // GET OLD RECORD
-        $oldrecord = $this->getRecord($this->key);
-        // PREDELETE
-        $this->preDelete($this->key, $oldrecord);
-        foreach ($this->fields as $K => $F)
-          $F->preDelete($this->key, $oldrecord);
-        // DELETE
-        $this->Delete($this->key, $oldrecord);
-        // POSTDELETE
-        foreach ($this->fields as $K => $F)
-          $F->postDelete($this->key, $oldrecord);
-        $this->postDelete($this->key, $oldrecord);
-        $this->execmessages = $this->actionmessages[DomMask::DODELETE];
-        break;
-    }
-  }
 
   public function createModes($modes)
   {
@@ -482,64 +989,7 @@ class DomMask extends \core\WAClass
   // type can be json, 4gl
   public function run($type = DomMask::JSON)
   {
-    $order = $this->getParameter($this->varorder);
-    $this->mode = $this->getParameter($this->varmode);
-    $this->realmode = $this->mode;
-    $data = array();
-    switch($order)
-    {
-      case 'start':
-        $data = $this->createJSON($data);
-        break;
-      case 'next':
-        $key = $this->getParameter($this->varkey);
-        $data = $this->getRecord($key, 1);
-        break;
-      case 'previous':
-        $key = $this->getParameter($this->varkey);
-        $data = $this->getRecord($key, -1);
-        break;
-      case 'last':
-        $key = $this->getParameter($this->varkey);
-        $data = $this->getRecord($key, 2);
-        break;
-      case 'first':
-        $key = $this->getParameter($this->varkey);
-        $data = $this->getRecord($key, -2);
-        break;
-      case 'image':
-        $key = $this->getParameter($this->varkey);
-        $field = $this->getParameter($this->varfield);
-        // gives the control to the field
-        foreach($this->fields as $f)
-          if ($f->name == $field)
-            $data = $f->prepareImage();
-        break;
-      case 'submit':
-        if ($this->mode == 1)
-          $this->realmode = DomMask::DOINSERT;
-        elseif ($this->mode == 2)
-        {
-          $this->realmode = DomMask::DOUPDATE;
-          $this->key = $this->getParameter($this->varkey);
-        }
-        elseif ($this->mode == 3)
-        {
-          $this->realmode = DomMask::DODELETE;
-          $this->key = $this->getParameter($this->varkey);
-        }
-        $this->execute();
-        $data = array('success' => true, 'messages' => array('text' => 'Exito'));
 
-//*************** NOTE: SHOULD GETS BACK THE FINAL RECORD FOR IF THERE ARE SOME CALCULATED FIELDS (LIKE IMAGES NAMES; SUM FIELDS; LINKS, PATHS, ETC)
-
-
-
-        break;
-    }
-
-    return $data;
-//    return json_encode($data);
   }
 
   public function code()

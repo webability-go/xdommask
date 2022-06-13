@@ -1,69 +1,69 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"errors"
+	"fmt"
+	"strconv"
+
+	"github.com/webability-go/wajaf"
+	"github.com/webability-go/xamboo/cms/context"
+)
 
 type FloatField struct {
 	*TextField
-	Default float64
-	Min     float64
-	Max     float64
+	DefaultValue  float64
+	Min           float64
+	Max           float64
+	StatusTooLow  string
+	StatusTooHigh string
 }
 
 func NewFloatField(name string) *FloatField {
-	ff := &FloatField{TextField: NewTextField(name)}
-	ff.Type = FIELD
+	ff := &FloatField{
+		TextField: NewTextField(name),
+	}
+	ff.TextType = TEXTTYPE_FLOAT
 	return ff
 }
 
 func (f *FloatField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewTextFieldElement(f.ID)
-
-	return b
+	//	t := wajaf.NewTextFieldElement(f.ID)
+	t := f.TextField.Compile()
+	t.SetAttribute("format", "^-{0,1}[0-9.,]{1,}([eE]-{0,1}[0-9,.]{1,}){0,}$")
+	if f.Min != 0 {
+		t.SetAttribute("min", fmt.Sprintf("%f", f.Min))
+		t.AddMessage("statustoolow", f.StatusTooLow)
+	}
+	if f.Max != 0 {
+		t.SetAttribute("max", fmt.Sprintf("%f", f.Max))
+		t.AddMessage("statustoohigh", f.StatusTooHigh)
+	}
+	return t
 }
 
-/*
-class DomMaskRealField extends DomMaskField
-{
-  function __construct($name = '', $iftable = false)
-  {
-    parent::__construct($name, $iftable);
-    $this->type = 'real';
-  }
-
-  public function create()
-  {
-    $f = new \wajaf\textfieldElement($this->name);
-
-    $f->setSize($this->size);
-    $f->setMinlength($this->minlength);
-    $f->setMaxlength($this->maxlength);
-    $f->setMinwords($this->minwords);
-    $f->setMaxwords($this->maxwords);
-    $f->setFormat($this->formatjs);
-
-    $f->setVisible($this->DomMask->createModes($this->authmodes));
-    $f->setInfo($this->DomMask->createModes($this->viewmodes));
-    $f->setReadonly($this->DomMask->createModes($this->readonlymodes));
-    $f->setNotnull($this->DomMask->createModes($this->notnullmodes));
-    $f->setDisabled('');
-    $f->setHelpmode('12');
-//    $f->setTabindex($this->tabindex);
-
-    $f->setData($this->title);
-
-    $f->setMessage('defaultvalue', $this->default);
-    $f->setMessage('helpdescription', $this->helpdescription);
-    $f->setMessage('statusnotnull', $this->statusnotnull);
-    $f->setMessage('statusbadformat', $this->statusbadformat);
-    $f->setMessage('statustooshort', $this->statustooshort);
-    $f->setMessage('statustoolong', $this->statustoolong);
-    $f->setMessage('statustoofewwords', $this->statustoofewwords);
-    $f->setMessage('statustoomanywords', $this->statustoomanywords);
-    $f->setMessage('statuscheck', $this->statuscheck);
-
-    return $f;
-  }
-
+func (f *FloatField) GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error) {
+	val, ignored, err := f.DataField.GetValue(ctx, mode)
+	fmt.Println("Float value = ", val, ignored, err)
+	if err != nil {
+		return val, ignored, err
+	}
+	newval, err := f.ConvertValue(val)
+	return newval, ignored, err
 }
-*/
+
+func (f *FloatField) ConvertValue(value interface{}) (interface{}, error) {
+	fval, ok := value.(float64)
+	if ok {
+		return fval, nil
+	}
+	f32val, ok := value.(float32)
+	if ok {
+		return float64(f32val), nil
+	}
+	sval, ok := value.(string)
+	if ok {
+		return strconv.ParseFloat(sval, 64)
+	}
+	return value, errors.New("Cannot convert value")
+}

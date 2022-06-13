@@ -1,9 +1,21 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+	"fmt"
 
+	"github.com/webability-go/wajaf"
+)
+
+// List Of Options field:
+// it is dynamic. when the user write the field, a list of possible options displays under the field and can be selected.
 type LOOField struct {
 	*DataField
+	DefaultValue string
+	Options      map[string]string
+	MultiSelect  bool
+
+	FocusJS string
+	BlurJS  string
 }
 
 func NewLOOField(name string) *LOOField {
@@ -14,70 +26,38 @@ func NewLOOField(name string) *LOOField {
 
 func (f *LOOField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewLOVFieldElement(f.ID)
+	l := wajaf.NewLOVFieldElement(f.ID)
 
-	return b
+	l.SetAttribute("style", f.Style)
+	l.SetAttribute("classname", f.ClassName)
+	l.SetData(f.Title)
+	l.SetAttribute("size", f.Size)
+
+	l.SetAttribute("visible", convertModes(f.AuthModes))
+	l.SetAttribute("info", convertModes(f.ViewModes))
+	l.SetAttribute("readonly", convertModes(f.ReadOnlyModes))
+	l.SetAttribute("notnull", convertModes(f.NotNullModes))
+	l.SetAttribute("disabled", convertModes(f.DisabledModes))
+	l.SetAttribute("helpmode", convertModes(f.HelpModes))
+
+	l.AddHelp("", "", f.HelpDescription)
+	l.AddMessage("defaultvalue", fmt.Sprint(f.DefaultValue))
+	l.AddMessage("statusnotnull", f.StatusNotNull)
+	l.AddMessage("statuscheck", f.StatusCheck)
+
+	l.AddEvent("blur", f.BlurJS)
+	l.AddEvent("focus", f.FocusJS)
+
+	ms := "yes"
+	if !f.MultiSelect {
+		ms = "no"
+	}
+	l.SetAttribute("multiselect", ms)
+	opts := wajaf.NewOptions()
+	for p, v := range f.Options {
+		opts.AddChild(wajaf.NewOption(p, v))
+	}
+	l.AddChild(opts)
+
+	return l
 }
-
-/*
-
-class DomMaskLOOField extends DomMaskField
-{
-  public $blur = null;
-  public $MultiSelect = false;       // boolean
-
-  public $options = null;            // array
-
-  public $ListTable = null;          // List DB_Table object
-  public $ListKey = null;            // the key field on list
-  public $ListName = null;           // the name field on list
-  public $ListOrder = null;          // field order by on list
-  public $ListWhere = null;          // where object on list
-  public $ListSeparator = ' / ';     // separator if the list name is an array
-  public $ListEncoded = false;       // boolean true if the list result is encoded
-  public $ListEntities = false;      // boolean true if the list result has entities
-
-  public $Controlling = null;        // this LOO controls another LOO (Id of the FIELD)
-  public $ControllingOptions = null; // The special options (array( father => array(childs => childs) ) )
-  public $ControllingDefault = null; // The default of the child controlled LOO
-  public $ControllingIndex = null;   // the tabindex of the controlled field, used to actualize field validity
-  public $OnEvent = null;            // If a DomMaskField::LOO or DomMaskField::LOV have a javascript event
-  public $CheckAsBool = false;       // set to true to get the check bos as a boolean instead of an array
-
-  function __construct($name = '', $iftable = false)
-  {
-    parent::__construct($name, $iftable);
-    $this->type = 'loo';
-  }
-
-  public function create()
-  {
-    $f = new \wajaf\lovfieldElement($this->name);
-
-    $f->setVisible($this->DomMask->createModes($this->authmodes));
-    $f->setInfo($this->DomMask->createModes($this->viewmodes));
-    $f->setReadonly($this->DomMask->createModes($this->readonlymodes));
-    $f->setNotnull($this->DomMask->createModes($this->notnullmodes));
-    $f->setDisabled('');
-    $f->setHelpmode('12');
-//    $f->setTabindex($this->tabindex);
-
-    $f->setData($this->title);
-
-    $f->setMessage('defaultvalue', $this->default);
-    $f->setMessage('helpdescription', $this->helpdescription);
-    $f->setMessage('statusnotnull', $this->statusnotnull);
-    $f->setMessage('statusbadformat', $this->statusbadformat);
-    $f->setMessage('statustooshort', $this->statustooshort);
-    $f->setMessage('statustoolong', $this->statustoolong);
-    $f->setMessage('statustoofewwords', $this->statustoofewwords);
-    $f->setMessage('statustoomanywords', $this->statustoomanywords);
-    $f->setMessage('statuscheck', $this->statuscheck);
-    $f->setOptions($this->options);
-
-    return $f;
-  }
-
-}
-
-*/
