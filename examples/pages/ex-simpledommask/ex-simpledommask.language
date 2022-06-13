@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<language id="ex-simpledommask" lang="en">
+  <entry id="mask.errormessage">Error, verify the messages</entry>
+  <entry id="mask.servermessage">Error on the server side, verify the messages</entry>
+  <entry id="mask.inserttitle">Insert new record:</entry>
+  <entry id="mask.updatetitle">Modify record:</entry>
+  <entry id="mask.deletetitle">Delete record:</entry>
+  <entry id="mask.viewtitle">View record data:</entry>
+
+  <entry id="int.title">Integer field:</entry>
+  <entry id="int.help.description"><![CDATA[edit any integer, between -10 and 222 included. Values inf 1 and sup 20 will send an error of insertion. Value sup 10 will send a uniqueness error.]]></entry>
+  <entry id="int.status.notnull">The integer cannot be null.</entry>
+  <entry id="int.status.badformat">This is not an integer.</entry>
+  <entry id="int.status.toolow">Integer is too low (min -10).</entry>
+  <entry id="int.status.toohigh">Integer is too high (max 222).</entry>
+
+  <entry id="text.title">Text field:</entry>
+  <entry id="text.help.description">Edit text field.</entry>
+  <entry id="text.status.notnull">The text field cannot be null.</entry>
+  <entry id="text.status.tooshort">Capture minimum 3 characters.</entry>
+  <entry id="text.status.toolong">Capture maximum 40 characters.</entry>
+
+  <entry id="password.title">Password field:</entry>
+  <entry id="password.help.description">Edit password field.</entry>
+  <entry id="password.status.notnull">The password field cannot be null.</entry>
+  <entry id="password.status.tooshort">Capture minimum 4 characters.</entry>
+  <entry id="password.status.toolong">Capture maximum 40 characters.</entry>
+
+  <entry id="float.title">Float field:</entry>
+  <entry id="float.help.description">edit any float number, between -123.456 and 234.567 included.</entry>
+  <entry id="float.status.notnull">The float number cannot be null.</entry>
+  <entry id="float.status.badformat">This is not a floating number.</entry>
+  <entry id="float.status.toolow">Float is too low (min -123.456).</entry>
+  <entry id="float.status.toohigh">Float is too high (max 234.567).</entry>
+
+  <entry id="mail.title">Email field:</entry>
+  <entry id="mail.help.description">edit any Email format.</entry>
+  <entry id="mail.status.notnull">The Email cannot be null.</entry>
+  <entry id="mail.status.badformat">This is not an email.</entry>
+
+  <entry id="textarea.title">Text Area field:</entry>
+  <entry id="textarea.help.description">Edit any text.</entry>
+  <entry id="textarea.status.notnull">The text cannot be null.</entry>
+
+  <entry id="info.title">Info Title: Combos:</entry>
+
+  <entry id="loo.title">List Of Options field:</entry>
+  <entry id="loo.help.description">Select a value.</entry>
+  <entry id="loo.status.notnull">Option cannot be null.</entry>
+
+  <entry id="date.title">Date field:</entry>
+  <entry id="date.help.description">Select a correct date from 2000-03-23 11:15:20 to 2050-10-25 16:37:25.</entry>
+  <entry id="date.status.notnull">Date cannot be null.</entry>
+
+  <entry id="image.title">Upload image field:</entry>
+  <entry id="image.help.description">Upload an image.</entry>
+  <entry id="image.status.notnull">Image cannot be null.</entry>
+
+  <entry id="video.title">Upload video field:</entry>
+  <entry id="video.help.description">Upload a video.</entry>
+  <entry id="video.status.notnull">Video cannot be null.</entry>
+
+  <entry id="file.title">Upload file field:</entry>
+  <entry id="file.help.description">Upload a file.</entry>
+  <entry id="file.status.notnull">File cannot be null.</entry>
+
+
+  <entry id="mask.buttonfirst.titleview">First record</entry>
+  <entry id="mask.buttonlast.titleview">Last record</entry>
+  <entry id="mask.buttonprevious.titleview">Previous record</entry>
+  <entry id="mask.buttonnext.titleview">Next record</entry>
+  <entry id="mask.buttoninsert.titleview">New record</entry>
+  <entry id="mask.buttonupdate.titleview">Update record</entry>
+  <entry id="mask.buttondelete.titleview">Delete record</entry>
+
+  <entry id="mask.buttonsubmit.titleinsert">Save data</entry>
+  <entry id="mask.buttonsubmit.titleupdate">Save changes</entry>
+  <entry id="mask.buttonsubmit.titledelete">Delete</entry>
+
+  <entry id="mask.buttonreset.titleinsert">Reset fields</entry>
+  <entry id="mask.buttonreset.titleupdate">Reset fields</entry>
+
+  <entry id="mask.buttonview.titleinsert">Cancel</entry>
+  <entry id="mask.buttonview.titleupdate">Cancel</entry>
+  <entry id="mask.buttonview.titledelete">Cancel</entry>
+
+</language>

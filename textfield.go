@@ -1,15 +1,28 @@
 package xdommask
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 
 	"github.com/webability-go/wajaf"
+	"github.com/webability-go/xdominion"
+
+	"github.com/webability-go/xamboo/cms/context"
+)
+
+const (
+	TEXTTYPE_TEXT    = "text"
+	TEXTTYPE_MASKED  = "masked"
+	TEXTTYPE_INTEGER = "integer"
+	TEXTTYPE_FLOAT   = "float"
+	TEXTTYPE_EMAIL   = "email"
 )
 
 type TextField struct {
 	*DataField
-	DefaultValue string
+	TextType string
 
 	Format   string
 	FormatJS string
@@ -18,8 +31,6 @@ type TextField struct {
 	MaxLength int
 	MinWords  int
 	MaxWords  int
-	Min       string
-	Max       string
 
 	StatusBadFormat    string
 	StatusTooShort     string
@@ -30,11 +41,15 @@ type TextField struct {
 	KeyUpJS string
 	FocusJS string
 	BlurJS  string
+
+	Check func(ctx *context.Context, mode Mode, value interface{}) error
+	Calc  func(ctx *context.Context, mode Mode, rec *xdominion.XRecord) (interface{}, error)
 }
 
 func NewTextField(name string) *TextField {
 	tf := &TextField{
 		DataField: NewDataField(name),
+		TextType:  TEXTTYPE_TEXT,
 		MinLength: -1,
 		MaxLength: -1,
 		MinWords:  -1,
@@ -48,9 +63,12 @@ func (f *TextField) Compile() wajaf.NodeDef {
 
 	t := wajaf.NewTextFieldElement(f.ID)
 
+	t.SetAttribute("texttype", f.TextType)
 	t.SetAttribute("style", f.Style)
 	t.SetAttribute("classname", f.ClassName)
+	t.SetAttribute("defaultvalue", fmt.Sprint(f.DefaultValue))
 	t.SetData(f.Title)
+
 	t.SetAttribute("size", f.Size)
 	if f.MinLength >= 0 {
 		t.SetAttribute("minlength", strconv.Itoa(f.MinLength))
@@ -66,12 +84,17 @@ func (f *TextField) Compile() wajaf.NodeDef {
 	}
 	t.SetAttribute("format", f.FormatJS)
 
-	t.SetAttribute("visible", createModes(f.AuthModes))
-	t.SetAttribute("info", createModes(f.ViewModes))
-	t.SetAttribute("readonly", createModes(f.ReadOnlyModes))
-	t.SetAttribute("notnull", createModes(f.NotNullModes))
-	t.SetAttribute("disabled", createModes(f.DisabledModes))
-	t.SetAttribute("helpmode", createModes(f.HelpModes))
+	t.SetAttribute("visible", convertModes(f.AuthModes))
+	t.SetAttribute("info", convertModes(f.ViewModes))
+	t.SetAttribute("readonly", convertModes(f.ReadOnlyModes))
+	t.SetAttribute("notnull", convertModes(f.NotNullModes))
+	t.SetAttribute("disabled", convertModes(f.DisabledModes))
+	t.SetAttribute("helpmode", convertModes(f.HelpModes))
+	if f.Auto {
+		t.SetAttribute("auto", "yes")
+	} else {
+		t.SetAttribute("auto", "no")
+	}
 
 	t.AddHelp("", "", f.HelpDescription)
 	t.AddMessage("defaultvalue", fmt.Sprint(f.DefaultValue))
@@ -82,10 +105,72 @@ func (f *TextField) Compile() wajaf.NodeDef {
 	t.AddMessage("statustoofewwords", f.StatusTooFewWords)
 	t.AddMessage("statustoomanywords", f.StatusTooManyWords)
 	t.AddMessage("statuscheck", f.StatusCheck)
+	t.AddMessage("automessage", f.AutoMessage)
 
 	t.AddEvent("keyup", f.KeyUpJS)
 	t.AddEvent("blur", f.BlurJS)
 	t.AddEvent("focus", f.FocusJS)
 
 	return t
+}
+
+// GetValue to get the value from the field when needed. return value, ignored bool (true = ignored by construct)
+func (f *TextField) GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error) {
+
+	if DEBUG {
+		fmt.Println("xdominion.TextField::GetValue", f.Name, mode)
+	}
+
+	val, ignore, err := f.DataField.GetValue(ctx, mode)
+	if err != nil || ignore {
+		return val, ignore, err
+	}
+
+	// FILTER VALUE:
+	// Lengths, formats
+	if val != nil {
+		sval := val.(string)
+		if f.MinLength > 0 && len(sval) < f.MinLength {
+			return val, ignore, errors.New(f.StatusTooShort)
+		}
+		if f.MaxLength > 0 && len(sval) > f.MaxLength {
+			return val, ignore, errors.New(f.StatusTooLong)
+		}
+		nw := countWords(sval)
+		if f.MinWords > 0 && nw < f.MinWords {
+			return val, ignore, errors.New(f.StatusTooFewWords)
+		}
+		if f.MaxWords > 0 && nw > f.MaxWords {
+			return val, ignore, errors.New(f.StatusTooManyWords)
+		}
+		if f.Format != "" {
+			matched, err := regexp.MatchString(f.Format, sval)
+			if err != nil {
+				return val, ignore, err
+			}
+			if !matched {
+				return val, ignore, errors.New(f.StatusBadFormat)
+			}
+		}
+	}
+
+	// extra code check
+	if f.Check != nil {
+		err = f.Check(ctx, mode, val)
+	}
+
+	return val, ignore, err
+}
+
+func countWords(s string) int {
+	/* JS algorith:
+	text = text.replace(/[\n\t\r]+/g, " ");
+	text = text.replace(/^[ ]+/, "");
+	text = text.replace(/[ ]+$/, "");
+	text = text.replace(/[ ]+/g, " ");
+	*/
+	re := regexp.MustCompile(`[\S]+`)
+	// Find all matches and return count.
+	results := re.FindAllString(s, -1)
+	return len(results)
 }

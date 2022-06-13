@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<application id="ex-simpledommask">
+
+  <container id="application" type="separatorContainer" width="max" height="max" mode="vertical" auto="yes">
+    <zone size="30" style="padding: 10px;">
+      <element id="createdb" type="buttonElement" haslistener="yes">Generate database
+        <event type="response">
+          <code><![CDATA[
+function(response){
+  var data = WA.JSON.decode(response.responseText);
+  alert(data.message);
+}
+]]></code>
+        </event>
+      </element>
+      <element type="htmlElement">{{DB}}</element>
+    </zone>
+    <zone size="*">
+{{FORM}}
+    </zone>
+  </container>
+
+</application>

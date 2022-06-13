@@ -13,6 +13,10 @@ func NewButtonField(name string, action string) *ButtonField {
 	return bf
 }
 
+func (f *ButtonField) GetName() string {
+	return f.Type + "::" + f.Action
+}
+
 func (f *ButtonField) Compile() wajaf.NodeDef {
 
 	b := wajaf.NewButtonElement(f.ID, f.Action)
@@ -25,7 +29,7 @@ func (f *ButtonField) Compile() wajaf.NodeDef {
 	b.AddMessage("titledelete", f.TitleDelete)
 	b.AddMessage("titleview", f.TitleView)
 
-	b.SetAttribute("visible", createModes(f.AuthModes))
+	b.SetAttribute("visible", convertModes(f.AuthModes))
 
 	return b
 }

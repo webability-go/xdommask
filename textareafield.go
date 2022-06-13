@@ -46,12 +46,12 @@ func (f *TextAreaField) Compile() wajaf.NodeDef {
 	}
 	t.SetAttribute("format", f.FormatJS)
 
-	t.SetAttribute("visible", createModes(f.AuthModes))
-	t.SetAttribute("info", createModes(f.ViewModes))
-	t.SetAttribute("readonly", createModes(f.ReadOnlyModes))
-	t.SetAttribute("notnull", createModes(f.NotNullModes))
-	t.SetAttribute("disabled", createModes(f.DisabledModes))
-	t.SetAttribute("helpmode", createModes(f.HelpModes))
+	t.SetAttribute("visible", convertModes(f.AuthModes))
+	t.SetAttribute("info", convertModes(f.ViewModes))
+	t.SetAttribute("readonly", convertModes(f.ReadOnlyModes))
+	t.SetAttribute("notnull", convertModes(f.NotNullModes))
+	t.SetAttribute("disabled", convertModes(f.DisabledModes))
+	t.SetAttribute("helpmode", convertModes(f.HelpModes))
 
 	t.AddHelp("", "", f.HelpDescription)
 	t.AddMessage("defaultvalue", fmt.Sprint(f.DefaultValue))
