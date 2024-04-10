@@ -1,24 +1,34 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+//	"github.com/webability-go/xamboo/cms/context"
+//
+// import "github.com/webability-go/wajaf"
+)
 
 type ImageField struct {
-	*DataField
+	*FileField
 }
 
 func NewImageField(name string) *ImageField {
-	imf := &ImageField{DataField: NewDataField(name)}
+	imf := &ImageField{FileField: NewFileField(name)}
 	imf.Type = FIELD
+	imf.ExtensionsAuth = map[string]bool{"jpg": true, "png": true}
+	imf.MimesAuth = map[string]string{
+		"image/jpeg": "filejpg.png",
+		"image/png":  "filepng.png",
+	}
 	return imf
 }
 
+/*
 func (f *ImageField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewMMCFieldElement("")
+	b := f.FileField.Compile()
 
 	return b
 }
-
+*/
 /*
 class DomMaskFieldImage extends DomMaskField
 {

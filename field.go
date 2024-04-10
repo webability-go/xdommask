@@ -20,18 +20,21 @@ const (
 	FIELD   = "field"
 	INFO    = "info"
 	HIDDEN  = "hidden"
+	GROUP   = "group"
 )
 
 type FieldDef interface {
 	Compile() wajaf.NodeDef
 	GetType() string
 	GetName() string
+	GetInRecord() bool
 	GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error)
 	ConvertValue(value interface{}) (interface{}, error)
+	PostGet(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error
 	PreInsert(ctx *context.Context, rec *xdominion.XRecord) error
-	PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error
+	PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) (bool, error) // bool = field changed true/false, need an update
 	PreUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
-	PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error
+	PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) (bool, error)
 	PreDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
 	PostDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error
 }
@@ -78,6 +81,10 @@ func (f *Field) GetName() string {
 	return f.Name
 }
 
+func (f *Field) GetInRecord() bool {
+	return false
+}
+
 func (f *Field) GetValue(ctx *context.Context, mode Mode) (interface{}, bool, error) {
 	if DEBUG {
 		fmt.Println("xdominion.Field::GetValue", mode, "field ignored by construct")
@@ -97,16 +104,20 @@ func (f *Field) PreInsert(ctx *context.Context, rec *xdominion.XRecord) error {
 	return nil
 }
 
-func (f *Field) PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error {
+func (f *Field) PostGet(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error {
 	return nil
+}
+
+func (f *Field) PostInsert(ctx *context.Context, key interface{}, rec *xdominion.XRecord) (bool, error) {
+	return false, nil
 }
 
 func (f *Field) PreUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error {
 	return nil
 }
 
-func (f *Field) PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) error {
-	return nil
+func (f *Field) PostUpdate(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, newrec *xdominion.XRecord) (bool, error) {
+	return false, nil
 }
 
 func (f *Field) PreDelete(ctx *context.Context, key interface{}, oldrec *xdominion.XRecord, rec *xdominion.XRecord) error {
@@ -140,10 +151,23 @@ type DataField struct {
 }
 
 func NewDataField(name string) *DataField {
-	return &DataField{Field: NewField(name)}
+	return &DataField{Field: NewField(name),
+		URLVariable: name,
+	}
+}
+
+func (f *DataField) GetInRecord() bool {
+	return f.InRecord
 }
 
 func (f *DataField) Compile() wajaf.NodeDef {
+	return nil
+}
+
+func (f *DataField) PostGet(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error {
+	if f.MD5Encrypted {
+		rec.Del(f.Name) // does not show the field on client side
+	}
 	return nil
 }
 
@@ -194,6 +218,8 @@ func (f *DataField) GetValue(ctx *context.Context, mode Mode) (interface{}, bool
 			data := []byte(sval)
 			sval = fmt.Sprintf("%x", md5.Sum(data))
 		}
+	} else if f.MD5Encrypted { // ignore MD5 is there is no value to modify
+		return nil, true, nil
 	}
 	return sval, false, nil
 }

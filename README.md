@@ -16,6 +16,25 @@ TO DO:
 Version Changes Control
 =======================
 
+v0.2.0 - 2024-04-09
+------------------------
+- Added searchableTextField to the list of available fields
+- Added groupField as sub-forms for master-detail relations
+- fileField modified to support multi file uploads
+- field.go modified to support group fields and MD5 encrypted fields
+- lovField modified to support radio buttons
+- mask modified to support templates of presentation, group fields, amin group flag, and multifile upload
+
+v0.1.1 - 2022-12-02
+------------------------
+- FieldDef has been added with new methods: GetInRecord and PostGet
+- FieldDef PostInsert and PostUpdate now return a boolean to notify the value has been modified, to update the record
+- The DataField initalizer now set the name of the field also to the URLVariable name 
+- Mask attribute VarField has been added to read incoming field name for fields listeners
+- Mask excute now know the "file" order to listen a Multipart post with files upload
+- DOINSERT and DODELETE orders now adds the primary key to the new record dataset, so PostInsert and PostUpdate methods can have access to the key
+- FileField, and extended ImageField and VideoField are now working as expected, to upload specific files. The extension, size and MIME type of file is verified
+
 v0.1.0 - 2022-06-13
 ------------------------
 - Added colorField, maskedField (replacing pwField)

@@ -1,24 +1,34 @@
 package xdommask
 
-import "github.com/webability-go/wajaf"
+import (
+//	"github.com/webability-go/xamboo/cms/context"
+//
+// import "github.com/webability-go/wajaf"
+)
 
 type VideoField struct {
-	*DataField
+	*FileField
 }
 
 func NewVideoField(name string) *VideoField {
-	vf := &VideoField{DataField: NewDataField(name)}
+	vf := &VideoField{FileField: NewFileField(name)}
 	vf.Type = FIELD
+	vf.ExtensionsAuth = map[string]bool{"mp4": true, "mov": true}
+	vf.MimesAuth = map[string]string{
+		"video/mp4": "filemp4.png",
+		"video/mov": "filemov.png",
+	}
 	return vf
 }
 
+/*
 func (f *VideoField) Compile() wajaf.NodeDef {
 
-	b := wajaf.NewMMCFieldElement("")
+	b := f.FileField.Compile()
 
 	return b
 }
-
+*/
 /*
 class DomMaskFieldVideo extends DomMaskField
 {

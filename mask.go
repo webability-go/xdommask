@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/webability-go/wajaf"
 	"github.com/webability-go/xdominion"
@@ -54,6 +55,9 @@ type Mask struct {
 	VarMode       string
 	VarOrder      string
 	VarKey        string
+	VarField      string
+	Maingroup     string
+	Template      string
 
 	Mode        Mode
 	AuthModes   Mode
@@ -97,6 +101,7 @@ func NewMask(id string, hooks MaskHooks, ctx *context.Context) (*Mask, error) {
 		VarMode:   "Mode",
 		VarOrder:  "Order",
 		VarKey:    "Key",
+		VarField:  "groupfield",
 		Counter:   1,
 	}
 	var err error
@@ -125,10 +130,15 @@ func (m *Mask) Compile(mode string, ctx *context.Context) wajaf.NodeDef {
 	group.SetAttribute("classname", m.ClassName)
 	group.SetAttribute("classnamezone", m.ClassNameZone)
 	group.SetAttribute("haslistener", "yes")
+	group.SetAttribute("maingroup", m.Maingroup)
+	if m.Template != "" {
+		group.AddMessage("template", m.Template)
+	}
 
 	group.SetAttribute("varmode", m.VarMode)
 	group.SetAttribute("varorder", m.VarOrder)
 	group.SetAttribute("varkey", m.VarKey)
+	group.SetAttribute("varfield", m.VarField)
 
 	group.SetAttribute("authmodes", convertModes(m.AuthModes))
 	group.SetAttribute("mode", mode)
@@ -161,7 +171,7 @@ func (m *Mask) Compile(mode string, ctx *context.Context) wajaf.NodeDef {
 			zcontrol.AddChild(f.Compile())
 			continue
 		}
-		z := wajaf.NewGroupZone(f.GetType(), "")
+		z := wajaf.NewGroupZone(f.GetType(), f.GetName()+"_zone")
 		z.AddChild(f.Compile())
 		group.AddChild(z)
 	}
@@ -208,7 +218,7 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 
 	order := ctx.Request.Form.Get(m.VarOrder)
 	if DEBUG {
-		fmt.Println("xdominion.Mask::Run", order)
+		fmt.Println("xdominion.Mask::Run", order, m.VarOrder, ctx.Request.Form)
 	}
 
 	messages := map[string]string{"text": ""}
@@ -234,6 +244,10 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 			}
 		}
 		if rec != nil {
+			err = m.PostGet(ctx, key, rec)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
 			recdata[nkey] = rec
 			data["data"] = recdata
 		}
@@ -250,6 +264,10 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 			}
 		}
 		if rec != nil {
+			err = m.PostGet(ctx, nkey, rec)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
 			recdata[nkey] = rec
 			data["data"] = recdata
 		}
@@ -267,6 +285,10 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 			}
 		}
 		if rec != nil {
+			err = m.PostGet(ctx, nkey, rec)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
 			recdata[nkey] = rec
 			data["data"] = recdata
 		}
@@ -284,6 +306,10 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 			}
 		}
 		if rec != nil {
+			err = m.PostGet(ctx, nkey, rec)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
 			recdata[nkey] = rec
 			data["data"] = recdata
 		}
@@ -300,6 +326,10 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 			}
 		}
 		if rec != nil {
+			err = m.PostGet(ctx, nkey, rec)
+			if err != nil {
+				return builRunMessage(data, messages, err)
+			}
 			recdata[nkey] = rec
 			data["data"] = recdata
 		}
@@ -339,19 +369,110 @@ func (m *Mask) Run(ctx *context.Context) (map[string]interface{}, error) {
 
 		*/
 
-		//	case "image":
-		/*
-			$key = $this->getParameter($this->varkey);
-			$field = $this->getParameter($this->varfield);
-			// gives the control to the field
-			foreach($this->fields as $f)
-				if ($f->name == $field)
-					$data = $f->prepareImage();
-			break;
-		*/
+	case "file":
+
+		key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+		field := ctx.Request.Form.Get(m.VarField)
+		if DEBUG {
+			fmt.Println("xdominion.Mask::Run@file", key, m.VarField, field)
+		}
+		for _, f := range m.Fields {
+			if f.GetName() == field {
+				var nf Ifilefield
+				var ok bool
+				if nf, ok = f.(*FileField); !ok {
+					if nf, ok = f.(*ImageField); !ok {
+						if nf, ok = f.(*VideoField); !ok {
+							// ERROR GRAVE
+						}
+					}
+				}
+				err := nf.PrepareFile(ctx)
+				if DEBUG {
+					fmt.Println("xdominion.Mask::Run@file::field->PrepareFile", err)
+				}
+				if err != nil {
+					data["message"] = err.Error()
+					data["success"] = false
+					return data, nil
+				}
+				// get back original image name, temporal name, icon name
+				data["temporal"] = nf.GetTemporalFileName()
+				data["filename"] = nf.GetOriginalFileName()
+				data["iconname"] = nf.GetIconName()
+			}
+		}
 	}
 	data["success"] = true
 	return data, nil
+}
+
+func (m *Mask) RunMultipart(ctx *context.Context) (map[string]interface{}, error) {
+
+	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, 1024*1024*1024) // 1 GB
+	ctx.Request.ParseMultipartForm(1024 * 1024)
+
+	// Read the form dinamically
+	data := map[string]interface{}{}
+
+	key := m.convertPrimaryKey(ctx.Request.Form.Get(m.VarKey))
+	field := ctx.Request.Form.Get(m.VarField)
+	if DEBUG {
+		fmt.Println("xdominion.Mask::Run@file", key, m.VarField, field)
+	}
+	for _, f := range m.Fields {
+		if f.GetName() == field {
+			var nf Ifilefield
+			var ok bool
+			if nf, ok = f.(*FileField); !ok {
+				if nf, ok = f.(*ImageField); !ok {
+					if nf, ok = f.(*VideoField); !ok {
+						// ERROR GRAVE
+					}
+				}
+			}
+			err := nf.PrepareFile(ctx)
+			if DEBUG {
+				fmt.Println("xdominion.Mask::Run@file::field->PrepareFile", err)
+			}
+			if err != nil {
+				data["message"] = err.Error()
+				data["success"] = false
+				return data, nil
+			}
+			// get back original image name, temporal name, icon name
+			if !nf.GetMultiFile() {
+				data["temporal"] = nf.GetTemporalFileName()
+				data["filename"] = nf.GetOriginalFileName()
+				data["iconname"] = nf.GetIconName()
+			} else {
+				data["temporal"] = nf.GetTemporalFileNames()
+				data["filename"] = nf.GetOriginalFileNames()
+				data["iconname"] = nf.GetIconNames()
+			}
+			mime := nf.GetMime()
+			if len(mime) > 6 && mime[0:6] == "image/" {
+				if !nf.GetMultiFile() {
+					data["image"] = nf.GetTemporalImage()
+				} else {
+					data["image"] = nf.GetTemporalImages()
+				}
+			}
+			data["mime"] = mime
+		}
+	}
+	data["success"] = true
+	return data, nil
+}
+
+func (m *Mask) PostGet(ctx *context.Context, key interface{}, rec *xdominion.XRecord) error {
+	for _, f := range m.Fields {
+		err := f.PostGet(ctx, key, rec)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Mask) getrecord(key interface{}, mode int) (string, *xdominion.XRecord, error) {
@@ -476,16 +597,42 @@ func (m *Mask) execute(ctx *context.Context, realmode Mode, formmode Mode, key i
 				return nil, messages, err
 			}
 		}
+		// assign key to prim key field !!!
+		primkey := m.Table.GetPrimaryKey()
+		primkeyname := primkey.GetName()
+		record.Set(primkeyname, key)
+
 		isok = true
+		changedrecord := &xdominion.XRecord{}
+		haschanged := false
 		for _, f := range m.Fields {
-			err = f.PostInsert(ctx, key, record)
+			changed, err := f.PostInsert(ctx, key, record)
 			if err != nil {
 				isok = false
 				messages[f.GetName()] = err.Error()
 			}
+			if changed && f.GetInRecord() {
+				haschanged = true
+				changedvalue, _ := record.Get(f.GetName())
+				changedrecord.Set(f.GetName(), changedvalue)
+			}
 		}
 		if !isok {
 			return nil, messages, errors.New("Error on post fields. Please check the form.")
+		}
+		if haschanged {
+			// do an update of new data
+			if m.Hooks.Update != nil {
+				err := m.Hooks.Update(m, ctx, key, changedrecord)
+				if err != nil {
+					return nil, messages, err
+				}
+			} else {
+				err := m.update(ctx, key, record, changedrecord)
+				if err != nil {
+					return nil, messages, err
+				}
+			}
 		}
 		if m.Hooks.PostInsert != nil {
 			err = m.Hooks.PostInsert(m, ctx, key, record)
@@ -538,16 +685,41 @@ func (m *Mask) execute(ctx *context.Context, realmode Mode, formmode Mode, key i
 				return nil, messages, err
 			}
 		}
+		primkey := m.Table.GetPrimaryKey()
+		primkeyname := primkey.GetName()
+		record.Set(primkeyname, key)
+
 		isok = true
+		changedrecord := &xdominion.XRecord{}
+		haschanged := false
 		for _, f := range m.Fields {
-			err := f.PostUpdate(ctx, key, oldrecord, record)
+			changed, err := f.PostUpdate(ctx, key, oldrecord, record)
 			if err != nil {
 				isok = false
 				messages[f.GetName()] = err.Error()
 			}
+			if changed && f.GetInRecord() {
+				haschanged = true
+				changedvalue, _ := record.Get(f.GetName())
+				changedrecord.Set(f.GetName(), changedvalue)
+			}
 		}
 		if !isok {
 			return nil, messages, errors.New("Error on post fields. Please check the form.")
+		}
+		if haschanged {
+			// do an update of new data
+			if m.Hooks.Update != nil {
+				err := m.Hooks.Update(m, ctx, key, changedrecord)
+				if err != nil {
+					return nil, messages, err
+				}
+			} else {
+				err := m.update(ctx, key, record, changedrecord)
+				if err != nil {
+					return nil, messages, err
+				}
+			}
 		}
 		if m.Hooks.PostUpdate != nil {
 			err := m.Hooks.PostUpdate(m, ctx, key, oldrecord, record)
