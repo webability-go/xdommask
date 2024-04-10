@@ -1,8 +1,6 @@
 package xdommask
 
-import (
 //	"github.com/webability-go/wajaf"
-)
 
 type MaskedField struct {
 	*TextField

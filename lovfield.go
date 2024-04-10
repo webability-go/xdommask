@@ -14,6 +14,7 @@ type LOVField struct {
 	DefaultValue string
 	Options      map[string]string
 	MultiSelect  bool
+	RadioButton  bool
 
 	Table      *xdominion.XTable
 	Order      *xdominion.XOrder
@@ -70,6 +71,11 @@ func (f *LOVField) Compile() wajaf.NodeDef {
 		ms = "no"
 	}
 	l.SetAttribute("multiselect", ms)
+	rb := "yes"
+	if !f.RadioButton {
+		rb = "no"
+	}
+	l.SetAttribute("radiobutton", rb)
 	opts := wajaf.NewOptions()
 	// Table ?
 	if f.Table != nil {
